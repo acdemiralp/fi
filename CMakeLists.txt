@@ -16,6 +16,7 @@ set(PROJECT_SOURCES
   include/fi/all.hpp
   include/fi/filter.hpp
   include/fi/format.hpp
+  include/fi/freeimage.hpp
   include/fi/image.hpp
 )
 include(assign_source_group)
