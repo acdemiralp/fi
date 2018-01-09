@@ -5,6 +5,9 @@
 
 #define FREEIMAGE_COLORORDER FREEIMAGE_COLORORDER_RGB
 
+#include <fi/filter.hpp>
+#include <fi/format.hpp>
+
 namespace fi
 {
 class image

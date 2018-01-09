@@ -14,6 +14,8 @@ set(PROJECT_SOURCES
   cmake/import_library.cmake
   
   include/fi/all.hpp
+  include/fi/filter.hpp
+  include/fi/format.hpp
   include/fi/image.hpp
 )
 include(assign_source_group)
