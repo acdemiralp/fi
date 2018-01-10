@@ -13,11 +13,17 @@ set(PROJECT_SOURCES
   cmake/assign_source_group.cmake
   cmake/import_library.cmake
   
-  include/fi/all.hpp
+  include/fi/color_channel.hpp
+  include/fi/color_type.hpp
+  include/fi/dithering_mode.hpp
   include/fi/filter.hpp
   include/fi/format.hpp
-  include/fi/freeimage.hpp
+  include/fi/free_image.hpp
   include/fi/image.hpp
+  include/fi/memory.hpp
+  include/fi/multi_image.hpp
+  include/fi/tag.hpp
+  include/fi/type.hpp
 )
 include(assign_source_group)
 assign_source_group(${PROJECT_SOURCES})
