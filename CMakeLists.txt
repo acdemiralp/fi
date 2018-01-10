@@ -17,11 +17,12 @@ set(PROJECT_SOURCES
   include/fi/color_type.hpp
   include/fi/dithering_mode.hpp
   include/fi/filter.hpp
-  include/fi/format.hpp
+  include/fi/format_info.hpp
   include/fi/free_image.hpp
   include/fi/image.hpp
   include/fi/memory.hpp
   include/fi/multi_image.hpp
+  include/fi/quantization_mode.hpp
   include/fi/span.hpp
   include/fi/tag.hpp
   include/fi/type.hpp

@@ -22,13 +22,13 @@ public:
   explicit memory  () : native_(FreeImage_OpenMemory())
   {
     if (!native_)
-      throw std::runtime_error("Unsuccessful FreeImage_OpenMemory.");
+      throw std::runtime_error("Failed FreeImage_OpenMemory.");
   }
   template<typename type = std::uint8_t>
   explicit memory  (fi::span<type> span) : native_(FreeImage_OpenMemory(reinterpret_cast<std::uint8_t*>(span.data), static_cast<unsigned long>(sizeof type * span.size)))
   {
     if (!native_)
-      throw std::runtime_error("Unsuccessful FreeImage_OpenMemory.");
+      throw std::runtime_error("Failed FreeImage_OpenMemory.");
   }
   memory           (const memory&  that) = delete;
   memory           (      memory&& temp) noexcept : native_(std::move(temp.native_))
