@@ -22,6 +22,7 @@ set(PROJECT_SOURCES
   include/fi/image.hpp
   include/fi/memory.hpp
   include/fi/multi_image.hpp
+  include/fi/span.hpp
   include/fi/tag.hpp
   include/fi/type.hpp
 )
