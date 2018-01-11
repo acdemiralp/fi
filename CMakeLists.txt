@@ -13,19 +13,21 @@ set(PROJECT_SOURCES
   cmake/assign_source_group.cmake
   cmake/import_library.cmake
   
-  include/fi/color_channel.hpp
-  include/fi/color_type.hpp
-  include/fi/dithering_mode.hpp
-  include/fi/filter.hpp
-  include/fi/format_info.hpp
+  include/fi/enums/color_channel.hpp
+  include/fi/enums/color_type.hpp
+  include/fi/enums/dithering_mode.hpp
+  include/fi/enums/filter.hpp
+  include/fi/enums/quantization_mode.hpp
+  include/fi/enums/type.hpp
+  include/fi/utility/rectangle.hpp
+  include/fi/utility/span.hpp
+  include/fi/format.hpp
   include/fi/free_image.hpp
   include/fi/image.hpp
+  include/fi/jpeg.hpp
   include/fi/memory.hpp
   include/fi/multi_image.hpp
-  include/fi/quantization_mode.hpp
-  include/fi/span.hpp
   include/fi/tag.hpp
-  include/fi/type.hpp
 )
 include(assign_source_group)
 assign_source_group(${PROJECT_SOURCES})

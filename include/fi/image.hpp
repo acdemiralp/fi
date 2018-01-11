@@ -12,14 +12,14 @@
 #define FREEIMAGE_COLORORDER 1
 #include <FreeImage.h>
 
-#include <fi/color_type.hpp>
-#include <fi/dithering_mode.hpp>
-#include <fi/filter.hpp>
-#include <fi/format_info.hpp>
+#include <fi/enums/color_type.hpp>
+#include <fi/enums/dithering_mode.hpp>
+#include <fi/enums/filter.hpp>
+#include <fi/enums/quantization_mode.hpp>
+#include <fi/enums/type.hpp>
+#include <fi/utility/span.hpp>
+#include <fi/format.hpp>
 #include <fi/memory.hpp>
-#include <fi/quantization_mode.hpp>
-#include <fi/span.hpp>
-#include <fi/type.hpp>
 
 namespace fi
 {
@@ -112,9 +112,9 @@ public:
     FreeImage_SaveToMemory(format_, native_, memory.native_, native_flags);
   }
   
-  format_info                              format                        () const
+  format                              format                        () const
   {
-    return format_info(format_);
+    return fi::format(format_);
   }                                                                       
   type                                     type                          () const
   {

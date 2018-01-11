@@ -10,7 +10,7 @@
 #define FREEIMAGE_COLORORDER 1
 #include <FreeImage.h>
 
-#include <fi/format_info.hpp>
+#include <fi/format.hpp>
 #include <fi/image.hpp>
 #include <fi/memory.hpp>
 
@@ -26,15 +26,14 @@ public:
       format_ = FreeImage_GetFIFFromFilename(filepath.c_str());
 
     native_ = FreeImage_OpenMultiBitmap(format_, filepath.c_str(), create, read_only, cache, native_flags);
-    if (!native_)
+    if (!native_) 
       throw std::runtime_error("FreeImage_OpenMultiBitmap failed.");
   }
-  explicit multi_image  (const memory& memory, const std::int32_t native_flags = 0)
+  explicit multi_image  (const memory&      memory  ,                                                                                    const std::int32_t native_flags = 0)
   {
-    format_ = FreeImage_GetFileTypeFromMemory(memory.native_, 0);
-
+    format_ = FreeImage_GetFileTypeFromMemory    (         memory.native_, 0);
     native_ = FreeImage_LoadMultiBitmapFromMemory(format_, memory.native_, native_flags);
-    if (!native_)
+    if (!native_) 
       throw std::runtime_error("FreeImage_LoadMultiBitmapFromMemory failed.");
   }
   explicit multi_image  (const multi_image&  that) = delete ;
@@ -58,18 +57,8 @@ public:
     }
     return *this;
   }
-
-  void        to_memory(memory& memory, const std::int32_t native_flags = 0) const
-  {
-    FreeImage_SaveMultiBitmapToMemory(format_, native_, memory.native_, native_flags);
-  }
-
-  format_info format   () const
-  {
-    return format_info(format_);
-  }
-
-  std::size_t size     () const
+  
+  std::size_t size     ()                                                    const
   {
     return static_cast<std::size_t>(FreeImage_GetPageCount(native_));
   }
@@ -79,24 +68,39 @@ public:
   }
   void        insert   (const std::size_t index, const image& image)
   {
+    if (index >= size()) throw std::out_of_range("Index out of range.");
     FreeImage_InsertPage(native_, static_cast<std::int32_t>(index), image.native_);
   }
   void        erase    (const std::size_t index)
   {
+    if (index >= size()) throw std::out_of_range("Index out of range.");
     FreeImage_DeletePage(native_, static_cast<std::int32_t>(index));
   }
-  void        swap     (const std::size_t source, const std::size_t target)
+  void        swap     (const std::size_t source, const std::size_t target)  const
   {
+    if (source >= size()) throw std::out_of_range("Source index out of range.");
+    if (target >= size()) throw std::out_of_range("Target index out of range.");
     FreeImage_MovePage(native_, static_cast<std::int32_t>(target), static_cast<std::int32_t>(source));
   }
-
-  image       lock     (const std::size_t index)
+                                                                         
+  image       lock     (const std::size_t index)                             const
   {
+    if (index >= size()) throw std::out_of_range("Index out of range.");
     return image(FreeImage_LockPage(native_, static_cast<std::int32_t>(index)));
   }
-  void        unlock   (const image& image, const bool changed = true)
+  void        unlock   (const image& image, const bool changed = true)       const
   {
     FreeImage_UnlockPage(native_, image.native_, changed);
+  }
+  
+  void        to_memory(memory& memory, const std::int32_t native_flags = 0) const
+  {
+    FreeImage_SaveMultiBitmapToMemory(format_, native_, memory.native_, native_flags);
+  }
+  
+  format      format   ()                                                    const
+  {
+    return fi::format(format_);
   }
 
 protected:

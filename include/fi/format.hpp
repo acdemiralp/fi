@@ -7,32 +7,32 @@
 
 #include <FreeImage.h>
 
-#include <fi/type.hpp>
+#include <fi/enums/type.hpp>
 
 namespace fi
 {
-struct format_info
+struct format
 {
-  explicit format_info(const FREE_IMAGE_FORMAT format)
+  explicit format(const FREE_IMAGE_FORMAT format)
   : native                                             (format)
   , name              (FreeImage_GetFormatFromFIF      (native))
   , description       (FreeImage_GetFIFDescription     (native))
   , mime_type         (FreeImage_GetFIFMimeType        (native))
   , extensions        (FreeImage_GetFIFExtensionList   (native))
   , regular_expression(FreeImage_GetFIFRegExpr         (native))
-  , read_support      (FreeImage_FIFSupportsReading    (native) != 0)
-  , write_support     (FreeImage_FIFSupportsWriting    (native) != 0)
-  , icc_support       (FreeImage_FIFSupportsICCProfiles(native) != 0)
-  , no_pixel_support  (FreeImage_FIFSupportsNoPixels   (native) != 0)
+  , supports_read     (FreeImage_FIFSupportsReading    (native) != 0)
+  , supports_write    (FreeImage_FIFSupportsWriting    (native) != 0)
+  , supports_icc      (FreeImage_FIFSupportsICCProfiles(native) != 0)
+  , supports_no_pixels(FreeImage_FIFSupportsNoPixels   (native) != 0)
   {
 
   }
 
-  bool check_support(const std::size_t bits_per_pixel) const
+  bool supports(const std::size_t bits_per_pixel) const
   {
     return FreeImage_FIFSupportsExportBPP(native, static_cast<std::int32_t>(bits_per_pixel)) != 0;
   }
-  bool check_support(const type        type          ) const
+  bool supports(const type        type          ) const
   {
     return FreeImage_FIFSupportsExportType(native, static_cast<FREE_IMAGE_TYPE>(type)) != 0;
   }
@@ -43,10 +43,10 @@ struct format_info
   std::string       mime_type         ;
   std::string       extensions        ;
   std::string       regular_expression;
-  bool              read_support      ;
-  bool              write_support     ;
-  bool              icc_support       ;
-  bool              no_pixel_support  ;
+  bool              supports_read     ;
+  bool              supports_write    ;
+  bool              supports_icc      ;
+  bool              supports_no_pixels;
 };
 }
 

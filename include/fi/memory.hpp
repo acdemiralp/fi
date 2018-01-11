@@ -9,7 +9,7 @@
 
 #include <FreeImage.h>
 
-#include <fi/span.hpp>
+#include <fi/utility/span.hpp>
 
 namespace fi
 {
@@ -25,7 +25,7 @@ public:
       throw std::runtime_error("FreeImage_OpenMemory failed.");
   }
   template<typename type = std::uint8_t>
-  explicit memory  (fi::span<type> span) : native_(FreeImage_OpenMemory(reinterpret_cast<std::uint8_t*>(span.data), static_cast<unsigned long>(sizeof type * span.size)))
+  explicit memory  (span<type> span) : native_(FreeImage_OpenMemory(reinterpret_cast<std::uint8_t*>(span.data), static_cast<unsigned long>(sizeof type * span.size)))
   {
     if (!native_)
       throw std::runtime_error("FreeImage_OpenMemory failed.");
@@ -50,20 +50,29 @@ public:
     }
     return *this;
   }
+  
+  template<typename type = std::uint8_t>
+  span<type>        data ()                                                               const
+  {
+    std::uint8_t* bytes;
+    unsigned long size ;
+    FreeImage_AcquireMemory(native_, &bytes, &size);
+    return {reinterpret_cast<type*>(bytes), static_cast<std::size_t>(size / sizeof(type))};
+  }
 
   template<typename type = std::uint8_t>
-  std::vector<type> read (const std::size_t size)
+  std::vector<type> read (const std::size_t size)                                         const
   {
     std::vector<type> buffer(size);
     FreeImage_ReadMemory(buffer.data(), static_cast<unsigned>(sizeof type), static_cast<unsigned>(buffer.size()), native_);
     return buffer;
   }
   template<typename type = std::uint8_t>
-  void              write(fi::span<type> span)                                            const
+  void              write(span<type> span)
   {
     FreeImage_WriteMemory(span.data, static_cast<unsigned>(sizeof type), static_cast<unsigned>(span.size), native_);
   }
-
+  
   bool              seek (const std::size_t offset, const std::int32_t origin = SEEK_SET) const
   {
     return FreeImage_SeekMemory(native_, static_cast<long>(offset), origin) != 0;
@@ -71,15 +80,6 @@ public:
   std::size_t       tell ()                                                               const
   {
     return static_cast<std::size_t>(FreeImage_TellMemory(native_));
-  }
-
-  template<typename type = std::uint8_t>
-  fi::span<type>    span ()                                                               const
-  {
-    std::uint8_t* bytes;
-    unsigned long size ;
-    FreeImage_AcquireMemory(native_, &bytes, &size);
-    return {reinterpret_cast<type*>(bytes), static_cast<std::size_t>(size / sizeof(type))};
   }
 
 protected:
