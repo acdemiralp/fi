@@ -1,11 +1,13 @@
 #ifndef FI_MULTI_IMAGE_HPP_
 #define FI_MULTI_IMAGE_HPP_
 
+#include <algorithm>
 #include <cstddef>
 #include <cstdint>
 #include <stdexcept>
 #include <string>
 #include <utility>
+#include <vector>
 
 #define FREEIMAGE_COLORORDER 1
 #include <FreeImage.h>
@@ -58,47 +60,60 @@ public:
     return *this;
   }
   
-  std::size_t size     ()                                                    const
+  std::size_t       size      ()                                                    const
   {
     return static_cast<std::size_t>(FreeImage_GetPageCount(native_));
   }
-  void        push_back(const image& image)
+  void              push_back (const image& image)
   {
     FreeImage_AppendPage(native_, image.native_);
   }
-  void        insert   (const std::size_t index, const image& image)
+  void              insert    (const std::size_t index, const image& image)
   {
     if (index >= size()) throw std::out_of_range("Index out of range.");
     FreeImage_InsertPage(native_, static_cast<std::int32_t>(index), image.native_);
   }
-  void        erase    (const std::size_t index)
+  void              erase     (const std::size_t index)
   {
     if (index >= size()) throw std::out_of_range("Index out of range.");
     FreeImage_DeletePage(native_, static_cast<std::int32_t>(index));
   }
-  void        swap     (const std::size_t source, const std::size_t target)  const
+  void              swap      (const std::size_t source, const std::size_t target)  const
   {
     if (source >= size()) throw std::out_of_range("Source index out of range.");
     if (target >= size()) throw std::out_of_range("Target index out of range.");
     FreeImage_MovePage(native_, static_cast<std::int32_t>(target), static_cast<std::int32_t>(source));
   }
-                                                                         
-  image       lock     (const std::size_t index)                             const
+     
+  std::vector<bool> lock_state()                                                    const
   {
-    if (index >= size()) throw std::out_of_range("Index out of range.");
+    int locked_page_count;
+    FreeImage_GetLockedPageNumbers(native_, nullptr, &locked_page_count);
+
+    std::vector<int> locked_pages(static_cast<std::size_t>(locked_page_count));
+    FreeImage_GetLockedPageNumbers(native_, locked_pages.data(), &locked_page_count);
+
+    std::vector<bool> pages(size(), false);
+    std::for_each(locked_pages.begin(), locked_pages.end(), [&pages] (int page_index) { pages[page_index] = true; });
+    return pages;
+  }
+  image             lock      (const std::size_t index)                             const
+  {
+    if (index >= size())     throw std::out_of_range ("Index out of range.");
+    if (lock_state()[index]) throw std::runtime_error("Requested page is already locked.");
     return image(FreeImage_LockPage(native_, static_cast<std::int32_t>(index)));
   }
-  void        unlock   (const image& image, const bool changed = true)       const
+  void              unlock    (const image& image, const bool changed = true)       const
   {
     FreeImage_UnlockPage(native_, image.native_, changed);
   }
   
-  void        to_memory(memory& memory, const std::int32_t native_flags = 0) const
+  void              to_memory (memory& memory, const std::int32_t native_flags = 0) const
   {
     FreeImage_SaveMultiBitmapToMemory(format_, native_, memory.native_, native_flags);
   }
-  
-  format      format   ()                                                    const
+                             
+  format            format    ()                                                    const
   {
     return fi::format(format_);
   }
