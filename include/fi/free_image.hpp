@@ -8,9 +8,9 @@
 
 namespace fi
 {
-inline void        initialize       (const bool only_local_plugins = false)
+inline void        initialize       ()
 {
-  FreeImage_Initialise(only_local_plugins);
+  FreeImage_Initialise(false);
 }
 inline void        uninitialize     ()
 {

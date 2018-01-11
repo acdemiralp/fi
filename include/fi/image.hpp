@@ -5,14 +5,17 @@
 #include <cstddef>
 #include <cstdint>
 #include <stdexcept>
+#include <string>
 #include <utility>
 #include <vector>
 
+#define FREEIMAGE_COLORORDER 1
 #include <FreeImage.h>
-#define FREEIMAGE_COLORORDER FREEIMAGE_COLORORDER_RGB
 
 #include <fi/color_type.hpp>
 #include <fi/dithering_mode.hpp>
+#include <fi/filter.hpp>
+#include <fi/format_info.hpp>
 #include <fi/memory.hpp>
 #include <fi/quantization_mode.hpp>
 #include <fi/span.hpp>
@@ -108,18 +111,17 @@ public:
   {
     FreeImage_SaveToMemory(format_, native_, memory.native_, native_flags);
   }
-                                                                         
-  std::string                              format                        () const
+  
+  format_info                              format                        () const
   {
-    return std::string(FreeImage_GetFormatFromFIF(format_));
-  }
-                                                                         
+    return format_info(format_);
+  }                                                                       
   type                                     type                          () const
   {
     return static_cast<fi::type>(FreeImage_GetImageType(native_));
   }
                                                                          
-  std::uint8_t*                            pixels                        () const
+  std::uint8_t*                            data                          () const
   {
     return FreeImage_GetBits(native_);
   }
@@ -157,7 +159,7 @@ public:
   {
     return static_cast<std::size_t>(FreeImage_GetBPP(native_));
   }
-  std::array<std::size_t , 2>              dimensions                    () const
+  std::array<std::size_t, 2>               dimensions                    () const
   {
     return {static_cast<std::size_t>(FreeImage_GetWidth(native_)), static_cast<std::size_t>(FreeImage_GetHeight(native_))};
   }
@@ -169,11 +171,15 @@ public:
   {
     return static_cast<std::size_t>(FreeImage_GetPitch(native_));
   }
+  std::size_t                              device_independent_size       () const
+  {
+    return static_cast<std::size_t>(FreeImage_GetDIBSize(native_));
+  }
   std::size_t                              size                          () const
   {
     return static_cast<std::size_t>(FreeImage_GetMemorySize(native_));
   }
-  void                                     set_palette                   (const fi::span<std::array<std::uint8_t, 4>> palette)
+  void                                     set_palette                   (const span<std::array<std::uint8_t, 4>> palette)
   {
     const auto native_palette = FreeImage_GetPalette(native_);
     for(auto i = 0; i < palette.size; ++i)
@@ -201,7 +207,7 @@ public:
     FreeImage_SetDotsPerMeterX(native_, static_cast<std::uint32_t>(dots_per_meter[0]));
     FreeImage_SetDotsPerMeterY(native_, static_cast<std::uint32_t>(dots_per_meter[1]));
   }
-  std::array<std::size_t , 2>              dots_per_meter                () const
+  std::array<std::size_t, 2>               dots_per_meter                () const
   {
     return {static_cast<std::size_t>(FreeImage_GetDotsPerMeterX(native_)), static_cast<std::size_t>(FreeImage_GetDotsPerMeterY(native_))};
   }
@@ -209,7 +215,7 @@ public:
   {
     return static_cast<fi::color_type>(FreeImage_GetColorType(native_));
   }
-  std::array<std::size_t , 3>              color_mask                    () const
+  std::array<std::size_t, 3>               color_mask                    () const
   {
     return {
       static_cast<std::size_t>(FreeImage_GetRedMask  (native_)), 
@@ -228,7 +234,7 @@ public:
   {
     FreeImage_SetTransparencyTable(native_, span.data, static_cast<std::int32_t>(span.size));
   }
-  fi::span<std::uint8_t>                   transparency_table            () const
+  span<std::uint8_t>                       transparency_table            () const
   {
     return {FreeImage_GetTransparencyTable(native_), static_cast<std::size_t>(FreeImage_GetTransparencyCount(native_))};
   }
@@ -273,7 +279,31 @@ public:
   {
     return image(FreeImage_GetThumbnail(native_));
   }
-                                           
+  BITMAPINFOHEADER*                        bitmap_info_header            () const
+  {
+    return FreeImage_GetInfoHeader(native_);
+  }
+  BITMAPINFO*                              bitmap_info                   () const
+  {
+    return FreeImage_GetInfo(native_);
+  }
+  
+  template<typename type>
+  void                                     set_icc_profile               (span<type> span)
+  {
+    FreeImage_CreateICCProfile(native_, span.data, static_cast<long>(span.size));
+  }
+  void                                     clear_icc_profile             ()
+  {
+    FreeImage_DestroyICCProfile(native_);
+  }
+  template<typename type>                                                
+  span<type>                               icc_profile                   () const
+  {
+    const auto profile = FreeImage_GetICCProfile(native_);
+    return {profile->data, static_cast<std::size_t>(profile->size)};
+  }
+  
   void                                     convert_to_4_bits             ()
   {
     replace(FreeImage_ConvertTo4Bits    (native_));
@@ -309,7 +339,7 @@ public:
   }
   void                                     convert_to_type               (fi::type type, const bool scale_linear = true)
   {
-    replace(FreeImage_ConvertToType(native_, static_cast<FREE_IMAGE_TYPE>(type), scale_linear);
+    replace(FreeImage_ConvertToType(native_, static_cast<FREE_IMAGE_TYPE>(type), scale_linear));
   }
 
   void                                     color_quantize                (quantization_mode  mode     )
@@ -337,17 +367,75 @@ public:
   {
     replace(FreeImage_TmoReinhard05(native_, intensity , contrast));
   }
+  
+  void                                     transform                     (const double angle, const std::array<double, 2>& translation, const std::array<double, 2>& rotation_origin, const bool use_mask = false)
+  {
+    replace(FreeImage_RotateEx(native_, angle, translation[0], translation[1], rotation_origin[0], rotation_origin[1], use_mask));
+  }
+  void                                     rotate                        (const double angle, const std::array<std::uint8_t, 4>& background_color)
+  {
+    RGBQUAD native_color;
+    native_color.rgbRed      = background_color[0];
+    native_color.rgbGreen    = background_color[1];
+    native_color.rgbBlue     = background_color[2];
+    native_color.rgbReserved = background_color[3];
+    replace(FreeImage_Rotate(native_, angle, &native_color));
+  }
+  void                                     rotate                        (const double angle)
+  {
+    replace(FreeImage_Rotate(native_, angle));
+  }
+  void                                     flip_horizontal               ()
+  {
+    FreeImage_FlipHorizontal(native_);
+  }
+  void                                     flip_vertical                 ()
+  {
+    FreeImage_FlipVertical(native_);
+  }
+                                                                         
+  void                                     rescale                       (const std::array<std::size_t, 2>& size, filter filter = filter::catmull_rom)
+  {
+    FreeImage_Rescale(native_, static_cast<std::int32_t>(size[0]), static_cast<std::int32_t>(size[1]), static_cast<FREE_IMAGE_FILTER>(filter));
+  }
+                                                                         
+  void                                     set_gamma                     (const double gamma     )
+  {
+    FreeImage_AdjustGamma     (native_, gamma);
+  }
+  void                                     set_brightness                (const double percentage)
+  {
+    FreeImage_AdjustBrightness(native_, percentage);
+  }
+  void                                     set_contrast                  (const double percentage)
+  {
+    FreeImage_AdjustContrast  (native_, percentage);
+  }
+  void                                     invert                        ()
+  {
+    FreeImage_Invert(native_);
+  }
+                                                                         
+  void                                     fill_background               (const std::array<std::uint8_t, 4>& color)
+  {
+    RGBQUAD native_color;
+    native_color.rgbRed      = color[0];
+    native_color.rgbGreen    = color[1];
+    native_color.rgbBlue     = color[2];
+    native_color.rgbReserved = color[3];
+    FreeImage_FillBackground(native_, &native_color, 0);
+  }
 
 protected:
   friend multi_image;
 
-  explicit image(FIBITMAP* native) : native_(native), format_(FIF_UNKNOWN), managed_(false)
+  explicit image  (FIBITMAP* native) : native_(native), format_(FIF_UNKNOWN), managed_(false)
   {
     if (!native_)
       throw std::runtime_error("Unmanaged FIBITMAP is empty.");
   }
   
-  void replace(FIBITMAP* native)
+  void     replace(FIBITMAP* native)
   {
     if (native_)
       FreeImage_Unload(native_);

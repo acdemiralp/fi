@@ -9,8 +9,8 @@
 #include <utility>
 #include <vector>
 
+#define FREEIMAGE_COLORORDER 1
 #include <FreeImage.h>
-#define FREEIMAGE_COLORORDER FREEIMAGE_COLORORDER_RGB
 
 #include <fi/image.hpp>
 #include <fi/memory.hpp>
@@ -20,14 +20,26 @@ namespace fi
 class multi_image
 {
 public:
-  multi_image           (const std::string& filepath, format format, const bool create = false, const bool read_only = false, const bool cache = false, const std::int32_t native_flags = 0) 
-  : native_(FreeImage_OpenMultiBitmap(static_cast<FREE_IMAGE_FORMAT>(format), filepath.c_str(), create, read_only, cache, native_flags))
+  explicit multi_image  (const std::string& filepath, const bool create = false, const bool read_only = false, const bool cache = false, const std::int32_t native_flags = 0) 
   {
+    format_ = FreeImage_GetFileType(filepath.c_str(), 0);
+    if (format_ == FIF_UNKNOWN)
+      format_ = FreeImage_GetFIFFromFilename(filepath.c_str());
+
+    native_ = FreeImage_OpenMultiBitmap(format_, filepath.c_str(), create, read_only, cache, native_flags);
     if (!native_)
-      throw std::runtime_error("FreeImage_OpenMultiBitmap failed. Filepath: " + filepath + ". Format: " + std::to_string(static_cast<std::int32_t>(format)));
+      throw std::runtime_error("FreeImage_OpenMultiBitmap failed.");
   }
-  multi_image           (const multi_image&  that) = delete ;
-  multi_image           (      multi_image&& temp) noexcept : native_(std::move(temp.native_))
+  explicit multi_image  (const memory& memory, const std::int32_t native_flags = 0)
+  {
+    format_ = FreeImage_GetFileTypeFromMemory(memory.native_, 0);
+
+    native_ = FreeImage_LoadMultiBitmapFromMemory(format_, memory.native_, native_flags);
+    if (!native_)
+      throw std::runtime_error("FreeImage_LoadMultiBitmapFromMemory failed.");
+  }
+  explicit multi_image  (const multi_image&  that) = delete ;
+  explicit multi_image  (      multi_image&& temp) noexcept : native_(std::move(temp.native_)), format_(std::move(temp.format_))
   {
     temp.native_ = nullptr;
   }
@@ -42,30 +54,50 @@ public:
     if (this != &temp)
     {
       native_      = std::move(temp.native_);
+      format_      = std::move(temp.format_);
       temp.native_ = nullptr;
     }
     return *this;
   }
 
-  void test()
+  void        to_memory(memory& memory, const std::int32_t native_flags = 0) const
   {
-    //FreeImage_GetPageCount(native_);
-    //FreeImage_AppendPage(native_, )
-    //  auto bitmap = FreeImage_LockPage(native_, 0);
-    //FreeImage_UnlockPage(native_, nullptr, true);
+    FreeImage_SaveMultiBitmapToMemory(format_, native_, memory.native_, native_flags);
   }
 
-  void from_memory(const memory& memory, format format, const std::int32_t native_flags = 0)
+  std::size_t size     () const
   {
-    native_ = FreeImage_LoadMultiBitmapFromMemory(static_cast<FREE_IMAGE_FORMAT>(format), memory.native_, native_flags);
+    return static_cast<std::size_t>(FreeImage_GetPageCount(native_));
   }
-  void to_memory  (      memory& memory, format format, const std::int32_t native_flags = 0) const
+  void        push_back(const image& image)
   {
-    FreeImage_SaveMultiBitmapToMemory(static_cast<FREE_IMAGE_FORMAT>(format), native_, memory.native_, native_flags);
+    FreeImage_AppendPage(native_, image.native_);
+  }
+  void        insert   (const std::size_t index, const image& image)
+  {
+    FreeImage_InsertPage(native_, static_cast<std::int32_t>(index), image.native_);
+  }
+  void        erase    (const std::size_t index)
+  {
+    FreeImage_DeletePage(native_, static_cast<std::int32_t>(index));
+  }
+  void        swap     (const std::size_t source, const std::size_t target)
+  {
+    FreeImage_MovePage(native_, static_cast<std::int32_t>(target), static_cast<std::int32_t>(source));
+  }
+
+  image       lock     (const std::size_t index)
+  {
+    return image(FreeImage_LockPage(native_, static_cast<std::int32_t>(index)));
+  }
+  void        unlock   (const image& image, const bool changed = true)
+  {
+    FreeImage_UnlockPage(native_, image.native_, changed);
   }
 
 protected:
-  FIMULTIBITMAP* native_;
+  FIMULTIBITMAP*    native_;
+  FREE_IMAGE_FORMAT format_;
 };
 }
 
