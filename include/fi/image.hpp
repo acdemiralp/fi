@@ -18,6 +18,7 @@
 #include <fi/enums/filter.hpp>
 #include <fi/enums/quantization_mode.hpp>
 #include <fi/enums/type.hpp>
+#include <fi/utility/rectangle.hpp>
 #include <fi/utility/span.hpp>
 #include <fi/format.hpp>
 #include <fi/memory.hpp>
@@ -29,28 +30,11 @@ class multi_image;
 class image
 {
 public: 
-  template<typename data_type = std::uint8_t>
-  explicit image  (data_type* data, std::array<std::size_t, 2> dimensions, type type = type::bitmap, const std::size_t bits_per_pixel = 8, const std::array<std::size_t, 3> rgb_mask = {0ull, 0ull, 0ull}, const bool shallow = false, const bool top_down = false) 
-  : format_ (FIF_UNKNOWN)
-  , managed_(!shallow)
-  {
-    const auto pitch = (bits_per_pixel * dimensions[0] + 31) / 32 * 4;
-    native_ = FreeImage_ConvertFromRawBitsEx(
-      !shallow                                           ,
-      reinterpret_cast<std::uint8_t*>(data              ),
-      static_cast<FREE_IMAGE_TYPE>   (type              ),
-      static_cast<std::int32_t>      (dimensions     [0]), 
-      static_cast<std::int32_t>      (dimensions     [1]),
-      static_cast<std::int32_t>      (pitch             ),
-      static_cast<std::int32_t>      (bits_per_pixel    ), 
-      static_cast<std::uint32_t>     (rgb_mask       [0]),
-      static_cast<std::uint32_t>     (rgb_mask       [1]), 
-      static_cast<std::uint32_t>     (rgb_mask       [2]),
-      top_down);
-    if (!native_)
-      throw std::runtime_error("FreeImage_ConvertFromRawBitsEx failed.");
-  }
-  explicit image  (                 std::array<std::size_t, 2> dimensions, type type = type::bitmap, const std::size_t bits_per_pixel = 8, const std::array<std::size_t, 3> rgb_mask = {0ull, 0ull, 0ull})
+  explicit image  (
+    const std::array<std::size_t, 2>&  dimensions     ,                                           
+    type                               type           = type::bitmap, 
+    const std::size_t                  bits_per_pixel = 8, 
+    const std::array<std::size_t, 3>   rgb_mask       = {0ull, 0ull, 0ull})
   : native_(FreeImage_AllocateT(
     static_cast<FREE_IMAGE_TYPE>(type), 
     static_cast<std::int32_t> (dimensions     [0]), 
@@ -59,13 +43,60 @@ public:
     static_cast<std::uint32_t>(rgb_mask       [0]),
     static_cast<std::uint32_t>(rgb_mask       [1]), 
     static_cast<std::uint32_t>(rgb_mask       [2])))
-  , format_ (FIF_UNKNOWN)
-  , managed_(true)
   {
     if (!native_)
       throw std::runtime_error("FreeImage_AllocateT failed.");
   }
-  explicit image  (const std::string& filepath, const std::int32_t native_flags = 0) : managed_(true)
+  template<typename color_type = std::array<std::uint8_t, 4>>
+  explicit image  (
+    const std::array<std::size_t , 2>& dimensions     , 
+    const color_type&                  color          ,
+    type                               type           = type::bitmap, 
+    const std::size_t                  bits_per_pixel = 8, 
+    const std::array<std::size_t, 3>   rgb_mask       = {0ull, 0ull, 0ull})
+  : native_(FreeImage_AllocateExT(
+    static_cast<FREE_IMAGE_TYPE>(type), 
+    static_cast<std::int32_t> (dimensions     [0]), 
+    static_cast<std::int32_t> (dimensions     [1]), 
+    static_cast<std::int32_t> (bits_per_pixel    ),
+    &color[0],
+    0,
+    nullptr,
+    static_cast<std::uint32_t>(rgb_mask[0]),
+    static_cast<std::uint32_t>(rgb_mask[1]),
+    static_cast<std::uint32_t>(rgb_mask[2])
+    ))
+  {
+    if (!native_)
+      throw std::runtime_error("FreeImage_AllocateExT failed.");
+  }
+  template<typename data_type = std::uint8_t>
+  explicit image  (
+    data_type*                        data           , 
+    const std::array<std::size_t, 2>& dimensions     ,                                           
+    type                              type           = type::bitmap, 
+    const std::size_t                 bits_per_pixel = 8, 
+    const std::array<std::size_t, 3>  rgb_mask       = {0ull, 0ull, 0ull}, 
+    const bool                        shallow        = false, 
+    const bool                        top_down       = false) 
+  : native_(FreeImage_ConvertFromRawBitsEx(
+    !shallow                                           ,
+    reinterpret_cast<std::uint8_t*>(data              ),
+    static_cast<FREE_IMAGE_TYPE>   (type              ),
+    static_cast<std::int32_t>      (dimensions     [0]), 
+    static_cast<std::int32_t>      (dimensions     [1]),
+    static_cast<std::int32_t>      ((bits_per_pixel * dimensions[0] + 31) / 32 * 4),
+    static_cast<std::int32_t>      (bits_per_pixel    ), 
+    static_cast<std::uint32_t>     (rgb_mask       [0]),
+    static_cast<std::uint32_t>     (rgb_mask       [1]), 
+    static_cast<std::uint32_t>     (rgb_mask       [2]),
+    top_down))
+  , managed_(!shallow)
+  {
+    if (!native_)
+      throw std::runtime_error("FreeImage_ConvertFromRawBitsEx failed.");
+  }
+  explicit image  (const std::string& filepath, const std::int32_t            native_flags = 0)
   {
     format_ = FreeImage_GetFileType(filepath.c_str(), 0);
     if (format_ == FIF_UNKNOWN)
@@ -75,7 +106,7 @@ public:
     if (!native_)
       throw std::runtime_error("FreeImage_Load failed.");
   }
-  explicit image  (const memory&      memory  , const std::int32_t native_flags = 0) : managed_(true)
+  explicit image  (const memory&      memory  , const std::int32_t            native_flags = 0)
   {
     format_ = FreeImage_GetFileTypeFromMemory(memory.native_, 0);
 
@@ -83,21 +114,28 @@ public:
     if (!native_)
       throw std::runtime_error("FreeImage_LoadFromMemory failed.");
   } 
-  explicit image  (const image&       that    , const color_channel channel)
+  explicit image  (const image&       that    , const color_channel           channel         )
   : native_ (that.type() == type::complex ? FreeImage_GetComplexChannel(that.native_, static_cast<FREE_IMAGE_COLOR_CHANNEL>(channel)) : FreeImage_GetChannel(that.native_, static_cast<FREE_IMAGE_COLOR_CHANNEL>(channel)))
   , format_ (that.format_)
-  , managed_(true)
   {
-    ;
+    if (!native_)
+      throw std::runtime_error(that.type() == type::complex ? "FreeImage_GetComplexChannel failed." : "FreeImage_GetChannel failed.");
+  }
+  explicit image  (const image&       that    , const rectangle<std::size_t>& rectangle       )
+  : native_ (FreeImage_Copy(that.native_, static_cast<std::int32_t>(rectangle.left), static_cast<std::int32_t>(rectangle.top), static_cast<std::int32_t>(rectangle.right), static_cast<std::int32_t>(rectangle.bottom)))
+  , format_ (that.format_)
+  {
+    if (!native_)
+      throw std::runtime_error("FreeImage_Copy failed.");
   }
   image           (const image&       that    ) 
-  : native_(FreeImage_Clone(that.native_)), format_(that.format_), managed_(true)
+  : native_(FreeImage_Clone(that.native_)), format_(that.format_)
   {
     if (!native_)
       throw std::runtime_error("FreeImage_Clone failed.");
   }
   image           (      image&&      temp    ) noexcept 
-  : native_(std::move(temp.native_)), format_(std::move(temp.format_)), managed_(temp.managed_)
+  : native_(std::move(temp.native_)), format_(std::move(temp.format_)), managed_(std::move(temp.managed_))
   {
     temp.native_ = nullptr;
   }
@@ -125,6 +163,16 @@ public:
       temp.native_ = nullptr;
     }
     return *this;
+  }
+  
+  image                                    create_view                   (const rectangle<std::size_t>& rectangle)
+  {
+    return image(FreeImage_CreateView(
+      native_, 
+      static_cast<std::uint32_t>(rectangle.left  ), 
+      static_cast<std::uint32_t>(rectangle.top   ), 
+      static_cast<std::uint32_t>(rectangle.right ), 
+      static_cast<std::uint32_t>(rectangle.bottom)));
   }
 
   bool                                     has_pixels                    () const
@@ -377,7 +425,6 @@ public:
   {
     replace(FreeImage_ConvertTo32Bits   (native_));
   }
-  
   void                                     convert_to_standard           (               const bool scale_linear = true)
   {
     replace(FreeImage_ConvertToStandardType(native_, scale_linear));
@@ -398,8 +445,7 @@ public:
   void                                     dither                        (dithering_mode     mode     )
   {
     replace(FreeImage_Dither(native_, static_cast<FREE_IMAGE_DITHER>(mode)));
-  }
-                                           
+  }                        
   void                                     set_tone_mapping_fattal02     (const double saturation = 0.5, const double attenuation = 0.85)
   {
     replace(FreeImage_TmoFattal02  (native_, saturation, attenuation));
@@ -443,16 +489,28 @@ public:
     FreeImage_FlipVertical(native_);
   }
                                                                          
-  void                                     rescale                       (const std::array<std::size_t, 2>& size, filter filter = filter::catmull_rom)
+  void                                     rescale                       (const std::array<std::size_t, 2>& target_size, filter filter = filter::catmull_rom)
   {
-    FreeImage_Rescale(native_, static_cast<std::int32_t>(size[0]), static_cast<std::int32_t>(size[1]), static_cast<FREE_IMAGE_FILTER>(filter));
+    replace(FreeImage_Rescale(native_, static_cast<std::int32_t>(target_size[0]), static_cast<std::int32_t>(target_size[1]), static_cast<FREE_IMAGE_FILTER>(filter)));
+  }
+  void                                     rescale_subimage              (const std::array<std::size_t, 2>& target_size, const rectangle<std::size_t>& source_rectangle, filter filter = filter::catmull_rom)
+  {
+    replace(FreeImage_RescaleRect(
+      native_, 
+      static_cast<std::int32_t>     (target_size[0]         ), 
+      static_cast<std::int32_t>     (target_size[1]         ), 
+      static_cast<std::int32_t>     (source_rectangle.left  ), 
+      static_cast<std::int32_t>     (source_rectangle.top   ), 
+      static_cast<std::int32_t>     (source_rectangle.right ), 
+      static_cast<std::int32_t>     (source_rectangle.bottom), 
+      static_cast<FREE_IMAGE_FILTER>(filter                 )));
   }
       
-  void                                     adjust_colors                 (                       const double brightness, const double contrast, const double gamma, const bool invert = false)
+  void                                     adjust                        (                       const double brightness, const double contrast, const double gamma, const bool invert = false)
   {
     FreeImage_AdjustColors(native_, brightness, contrast, gamma, invert);
   }
-  void                                     adjust_colors                 (color_channel channel, const double brightness, const double contrast, const double gamma, const bool invert = false)
+  void                                     adjust                        (color_channel channel, const double brightness, const double contrast, const double gamma, const bool invert = false)
   {
     std::array<std::uint8_t, 256> lut;
     FreeImage_GetAdjustColorsLookupTable(lut.data(), brightness, contrast, gamma, invert);
@@ -475,21 +533,28 @@ public:
     FreeImage_Invert(native_);
   }
 
+  std::array<unsigned long, 256>           histogram                     (color_channel channel)
+  {
+    std::array<unsigned long, 256> histogram_native;
+    FreeImage_GetHistogram(native_, histogram_native.data(), static_cast<FREE_IMAGE_COLOR_CHANNEL>(channel));
+    return histogram_native;
+  }
+  template<typename color_type>
+  void                                     apply_color_mapping           (span<color_type> source, span<color_type> target, const bool ignore_alpha = false, const bool two_way = false) const
+  {
+    FreeImage_ApplyColorMapping       (native_, reinterpret_cast<RGBQUAD*>     (source.data), reinterpret_cast<RGBQUAD*>     (target.data), static_cast<unsigned>(source.size), ignore_alpha, two_way);
+  }
+  template<typename index_type>
+  void                                     apply_palette_index_mapping   (span<index_type> source, span<index_type> target, const bool ignore_alpha = false, const bool two_way = false) const
+  {
+    FreeImage_ApplyPaletteIndexMapping(native_, reinterpret_cast<std::uint8_t*>(source.data), reinterpret_cast<std::uint8_t*>(target.data), static_cast<unsigned>(source.size),               two_way);
+  }
+
   void                                     set_channel                   (color_channel channel, const image& image)
   {
     type() == type::complex 
       ? FreeImage_SetComplexChannel(native_, image.native_, static_cast<FREE_IMAGE_COLOR_CHANNEL>(channel)) 
       : FreeImage_SetChannel       (native_, image.native_, static_cast<FREE_IMAGE_COLOR_CHANNEL>(channel));
-  }
-
-  void                                     fill_background               (const std::array<std::uint8_t, 4>& color)
-  {
-    RGBQUAD native_color;
-    native_color.rgbRed      = color[0];
-    native_color.rgbGreen    = color[1];
-    native_color.rgbBlue     = color[2];
-    native_color.rgbReserved = color[3];
-    FreeImage_FillBackground(native_, &native_color, 0);
   }
 
   void                                     overlay                       (const image& image, const std::array<std::size_t, 2>& position, const std::size_t alpha = 255)
@@ -514,10 +579,37 @@ public:
     FreeImage_PreMultiplyWithAlpha(native_);
   }
 
+  void                                     fill_background               (const std::array<std::uint8_t, 4>& color)
+  {
+    RGBQUAD native_color;
+    native_color.rgbRed      = color[0];
+    native_color.rgbGreen    = color[1];
+    native_color.rgbBlue     = color[2];
+    native_color.rgbReserved = color[3];
+    FreeImage_FillBackground(native_, &native_color, 0);
+  }
+  template<typename color_type = std::array<std::uint8_t, 4>>
+  void                                     resize_canvas                 (const rectangle<std::int32_t>& rectangle, const color_type& color, const std::int32_t native_options = 0)
+  {
+    replace(FreeImage_EnlargeCanvas(
+      native_         , 
+      rectangle.left  ,
+      rectangle.top   , 
+      rectangle.right , 
+      rectangle.bottom,
+      &color[0]       ,
+      native_options));
+  }
+
+  void                                     multigrid_poisson_solver      (const std::size_t iterations)
+  {
+    replace(FreeImage_MultigridPoissonSolver(native_, static_cast<std::int32_t>(iterations)));
+  }
+
 protected:
   friend multi_image;
 
-  explicit image  (FIBITMAP* native) : native_(native), format_(FIF_UNKNOWN), managed_(false)
+  explicit image  (FIBITMAP* native) : native_(native), managed_(false)
   {
     if (!native_)
       throw std::runtime_error("Unmanaged FIBITMAP is empty.");
@@ -532,9 +624,9 @@ protected:
       throw std::runtime_error("Failed replace.");
   }
 
-  FIBITMAP*         native_ ;
-  FREE_IMAGE_FORMAT format_ ;
-  bool              managed_;
+  FIBITMAP*         native_  ;
+  FREE_IMAGE_FORMAT format_  = FIF_UNKNOWN;
+  bool              managed_ = true       ;
 };
 }
 
