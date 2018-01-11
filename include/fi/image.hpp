@@ -27,8 +27,29 @@ class multi_image;
 
 class image
 {
-public:
-  explicit image  (std::array<std::size_t, 2> dimensions, type type = type::bitmap, const std::size_t bits_per_pixel = 8, const std::array<std::size_t, 3> rgb_mask = {0ull, 0ull, 0ull})
+public: 
+  template<typename data_type = std::uint8_t>
+  explicit image  (data_type* data, std::array<std::size_t, 2> dimensions, type type = type::bitmap, const std::size_t bits_per_pixel = 8, const std::array<std::size_t, 3> rgb_mask = {0ull, 0ull, 0ull}, const bool shallow = false, const bool top_down = false)
+  : format_ (FIF_UNKNOWN)
+  , managed_(!shallow)
+  {
+    const auto pitch = (bits_per_pixel * dimensions[0] + 31) / 32 * 4;
+    native_ = FreeImage_ConvertFromRawBitsEx(
+      !shallow                                           ,
+      reinterpret_cast<std::uint8_t*>(data              ),
+      static_cast<FREE_IMAGE_TYPE>   (type              ),
+      static_cast<std::int32_t>      (dimensions     [0]), 
+      static_cast<std::int32_t>      (dimensions     [1]),
+      static_cast<std::int32_t>      (pitch             ),
+      static_cast<std::int32_t>      (bits_per_pixel    ), 
+      static_cast<std::uint32_t>     (rgb_mask       [0]),
+      static_cast<std::uint32_t>     (rgb_mask       [1]), 
+      static_cast<std::uint32_t>     (rgb_mask       [2]),
+      top_down);
+    if (!native_)
+      throw std::runtime_error("FreeImage_ConvertFromRawBitsEx failed.");
+  }
+  explicit image  (                 std::array<std::size_t, 2> dimensions, type type = type::bitmap, const std::size_t bits_per_pixel = 8, const std::array<std::size_t, 3> rgb_mask = {0ull, 0ull, 0ull})
   : native_(FreeImage_AllocateT(
     static_cast<FREE_IMAGE_TYPE>(type), 
     static_cast<std::int32_t> (dimensions     [0]), 
@@ -61,6 +82,7 @@ public:
     if (!native_)
       throw std::runtime_error("FreeImage_LoadFromMemory failed.");
   } 
+ 
   image           (const image&  that) 
   : native_(FreeImage_Clone(that.native_)), format_(that.format_), managed_(true)
   {
@@ -102,7 +124,23 @@ public:
   {
     return FreeImage_HasPixels(native_) != 0;
   }
-                                                                         
+  
+  template<typename data_type = std::uint8_t>
+  std::vector<data_type>                   to_raw                        (const bool top_down = false) const
+  {
+    std::vector<data_type> buffer(dimensions()[0] * pitch() / sizeof data_type);
+    auto mask = color_mask();
+    FreeImage_ConvertToRawBits(
+      reinterpret_cast<std::uint8_t*>(buffer.data()),
+      native_,
+      static_cast<std::int32_t> (pitch()),
+      static_cast<std::uint32_t>(bits_per_pixel()),
+      static_cast<std::uint32_t>(mask[0]),
+      static_cast<std::uint32_t>(mask[1]),
+      static_cast<std::uint32_t>(mask[2]),
+      top_down);
+    return buffer;
+  }
   void                                     to_file                       (const std::string& filepath, const std::int32_t native_flags = 0) const
   {
     FreeImage_Save(format_, native_, filepath.c_str(), native_flags);
