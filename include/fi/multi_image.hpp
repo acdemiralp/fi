@@ -33,7 +33,8 @@ public:
   }
   explicit multi_image  (const memory&      memory  ,                                                                                    const std::int32_t native_flags = 0)
   {
-    format_ = FreeImage_GetFileTypeFromMemory    (         memory.native_, 0);
+    format_ = FreeImage_GetFileTypeFromMemory(memory.native_, 0);
+
     native_ = FreeImage_LoadMultiBitmapFromMemory(format_, memory.native_, native_flags);
     if (!native_) 
       throw std::runtime_error("FreeImage_LoadMultiBitmapFromMemory failed.");
@@ -68,12 +69,12 @@ public:
   {
     FreeImage_AppendPage(native_, image.native_);
   }
-  void              insert    (const std::size_t index, const image& image)
+  void              insert    (const std::size_t index , const image& image)
   {
     if (index >= size()) throw std::out_of_range("Index out of range.");
     FreeImage_InsertPage(native_, static_cast<std::int32_t>(index), image.native_);
   }
-  void              erase     (const std::size_t index)
+  void              erase     (const std::size_t index )
   {
     if (index >= size()) throw std::out_of_range("Index out of range.");
     FreeImage_DeletePage(native_, static_cast<std::int32_t>(index));
