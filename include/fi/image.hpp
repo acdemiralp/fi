@@ -12,6 +12,7 @@
 #define FREEIMAGE_COLORORDER 1
 #include <FreeImage.h>
 
+#include <fi/enums/color_channel.hpp>
 #include <fi/enums/color_type.hpp>
 #include <fi/enums/dithering_mode.hpp>
 #include <fi/enums/filter.hpp>
@@ -29,7 +30,7 @@ class image
 {
 public: 
   template<typename data_type = std::uint8_t>
-  explicit image  (data_type* data, std::array<std::size_t, 2> dimensions, type type = type::bitmap, const std::size_t bits_per_pixel = 8, const std::array<std::size_t, 3> rgb_mask = {0ull, 0ull, 0ull}, const bool shallow = false, const bool top_down = false)
+  explicit image  (data_type* data, std::array<std::size_t, 2> dimensions, type type = type::bitmap, const std::size_t bits_per_pixel = 8, const std::array<std::size_t, 3> rgb_mask = {0ull, 0ull, 0ull}, const bool shallow = false, const bool top_down = false) 
   : format_ (FIF_UNKNOWN)
   , managed_(!shallow)
   {
@@ -82,14 +83,20 @@ public:
     if (!native_)
       throw std::runtime_error("FreeImage_LoadFromMemory failed.");
   } 
- 
-  image           (const image&  that) 
+  explicit image  (const image&       that    , const color_channel channel)
+  : native_ (that.type() == type::complex ? FreeImage_GetComplexChannel(that.native_, static_cast<FREE_IMAGE_COLOR_CHANNEL>(channel)) : FreeImage_GetChannel(that.native_, static_cast<FREE_IMAGE_COLOR_CHANNEL>(channel)))
+  , format_ (that.format_)
+  , managed_(true)
+  {
+    ;
+  }
+  image           (const image&       that    ) 
   : native_(FreeImage_Clone(that.native_)), format_(that.format_), managed_(true)
   {
     if (!native_)
       throw std::runtime_error("FreeImage_Clone failed.");
   }
-  image           (      image&& temp) noexcept 
+  image           (      image&&      temp    ) noexcept 
   : native_(std::move(temp.native_)), format_(std::move(temp.format_)), managed_(temp.managed_)
   {
     temp.native_ = nullptr;
@@ -99,7 +106,7 @@ public:
     if (native_ && managed_)
       FreeImage_Unload(native_);
   }
-  image& operator=(const image&  that)
+  image& operator=(const image&       that    )
   {
     native_  = FreeImage_Clone(that.native_);
     format_  = that.format_;
@@ -108,7 +115,7 @@ public:
       throw std::runtime_error("FreeImage_Clone failed.");
     return *this;
   }
-  image& operator=(      image&& temp) noexcept
+  image& operator=(      image&&      temp    ) noexcept
   {
     if (this != &temp)
     {
@@ -371,8 +378,6 @@ public:
     replace(FreeImage_ConvertTo32Bits   (native_));
   }
   
-
-
   void                                     convert_to_standard           (               const bool scale_linear = true)
   {
     replace(FreeImage_ConvertToStandardType(native_, scale_linear));
@@ -442,24 +447,41 @@ public:
   {
     FreeImage_Rescale(native_, static_cast<std::int32_t>(size[0]), static_cast<std::int32_t>(size[1]), static_cast<FREE_IMAGE_FILTER>(filter));
   }
-                                                                         
-  void                                     set_gamma                     (const double gamma     )
+      
+  void                                     adjust_colors                 (                       const double brightness, const double contrast, const double gamma, const bool invert = false)
   {
-    FreeImage_AdjustGamma     (native_, gamma);
+    FreeImage_AdjustColors(native_, brightness, contrast, gamma, invert);
   }
-  void                                     set_brightness                (const double percentage)
+  void                                     adjust_colors                 (color_channel channel, const double brightness, const double contrast, const double gamma, const bool invert = false)
+  {
+    std::array<std::uint8_t, 256> lut;
+    FreeImage_GetAdjustColorsLookupTable(lut.data(), brightness, contrast, gamma, invert);
+    FreeImage_AdjustCurve               (native_, lut.data(), static_cast<FREE_IMAGE_COLOR_CHANNEL>(channel));
+  }
+  void                                     adjust_brightness             (const double percentage)
   {
     FreeImage_AdjustBrightness(native_, percentage);
   }
-  void                                     set_contrast                  (const double percentage)
+  void                                     adjust_contrast               (const double percentage)
   {
     FreeImage_AdjustContrast  (native_, percentage);
+  }
+  void                                     adjust_gamma                  (const double gamma     )
+  {
+    FreeImage_AdjustGamma     (native_, gamma);
   }
   void                                     invert                        ()
   {
     FreeImage_Invert(native_);
   }
-                                                                         
+
+  void                                     set_channel                   (color_channel channel, const image& image)
+  {
+    type() == type::complex 
+      ? FreeImage_SetComplexChannel(native_, image.native_, static_cast<FREE_IMAGE_COLOR_CHANNEL>(channel)) 
+      : FreeImage_SetChannel       (native_, image.native_, static_cast<FREE_IMAGE_COLOR_CHANNEL>(channel));
+  }
+
   void                                     fill_background               (const std::array<std::uint8_t, 4>& color)
   {
     RGBQUAD native_color;
@@ -468,6 +490,28 @@ public:
     native_color.rgbBlue     = color[2];
     native_color.rgbReserved = color[3];
     FreeImage_FillBackground(native_, &native_color, 0);
+  }
+
+  void                                     overlay                       (const image& image, const std::array<std::size_t, 2>& position, const std::size_t alpha = 255)
+  {
+    FreeImage_Paste(native_, image.native_, static_cast<std::int32_t>(position[0]), static_cast<std::int32_t>(position[1]), static_cast<std::int32_t>(alpha));
+  }
+  void                                     composite                     (const std::array<std::uint8_t, 4>& background_color)
+  {
+    RGBQUAD native_color;
+    native_color.rgbRed      = background_color[0];
+    native_color.rgbGreen    = background_color[1];
+    native_color.rgbBlue     = background_color[2];
+    native_color.rgbReserved = background_color[3];
+    replace(FreeImage_Composite(native_, false, &native_color, nullptr));
+  }
+  void                                     composite                     (const image&                       background_image)
+  {
+    replace(FreeImage_Composite(native_, true, nullptr, background_image.native_));
+  }
+  void                                     pre_multiply_alpha            () const
+  {
+    FreeImage_PreMultiplyWithAlpha(native_);
   }
 
 protected:
