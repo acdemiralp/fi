@@ -112,7 +112,7 @@ public:
     FreeImage_SaveToMemory(format_, native_, memory.native_, native_flags);
   }
   
-  format                              format                        () const
+  format                                   format                        () const
   {
     return fi::format(format_);
   }                                                                       
@@ -333,6 +333,8 @@ public:
     replace(FreeImage_ConvertTo32Bits   (native_));
   }
   
+
+
   void                                     convert_to_standard           (               const bool scale_linear = true)
   {
     replace(FreeImage_ConvertToStandardType(native_, scale_linear));
@@ -344,7 +346,7 @@ public:
 
   void                                     color_quantize                (quantization_mode  mode     )
   {
-    replace(FreeImage_ColorQuantize(native_, static_cast<FREE_IMAGE_QUANTIZE>(mode)));
+    replace(FreeImage_ColorQuantize  (native_, static_cast<FREE_IMAGE_QUANTIZE>(mode)));
   }
   void                                     threshold                     (const std::uint8_t threshold)
   {
@@ -367,7 +369,11 @@ public:
   {
     replace(FreeImage_TmoReinhard05(native_, intensity , contrast));
   }
-  
+  void                                     set_tone_mapping_reinhard05_ex(const double intensity  = 0.0, const double contrast    = 0.0 , const double adaptation = 1.0, const double color_correction = 0.0)
+  {
+    replace(FreeImage_TmoReinhard05Ex(native_, intensity, contrast, adaptation, color_correction));
+  }
+
   void                                     transform                     (const double angle, const std::array<double, 2>& translation, const std::array<double, 2>& rotation_origin, const bool use_mask = false)
   {
     replace(FreeImage_RotateEx(native_, angle, translation[0], translation[1], rotation_origin[0], rotation_origin[1], use_mask));
