@@ -3,15 +3,14 @@
 
 #include <cstddef>
 #include <cstdint>
-#include <memory>
 #include <stdexcept>
 #include <string>
 #include <utility>
-#include <vector>
 
 #define FREEIMAGE_COLORORDER 1
 #include <FreeImage.h>
 
+#include <fi/format_info.hpp>
 #include <fi/image.hpp>
 #include <fi/memory.hpp>
 
@@ -63,6 +62,11 @@ public:
   void        to_memory(memory& memory, const std::int32_t native_flags = 0) const
   {
     FreeImage_SaveMultiBitmapToMemory(format_, native_, memory.native_, native_flags);
+  }
+
+  format_info format   () const
+  {
+    return format_info(format_);
   }
 
   std::size_t size     () const
