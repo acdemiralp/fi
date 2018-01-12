@@ -20,17 +20,22 @@ class image;
 class metadata
 {
 public:
-  metadata           ()                               : native_(FreeImage_CreateTag())
+  explicit metadata  () : native_(FreeImage_CreateTag())
   {
     if (!native_)
       throw std::runtime_error("FreeImage_CreateTag failed.");
   }
-  metadata           (const metadata&  that)          : native_(FreeImage_CloneTag(that.native_))
+  explicit metadata  (FITAG* native) : native_(native), managed_(false)
+  {
+    if (!native_)
+      throw std::runtime_error("FITAG is nullptr.");
+  }
+  metadata           (const metadata&  that) : native_(FreeImage_CloneTag(that.native_))
   {
     if (!native_)
       throw std::runtime_error("FreeImage_CloneTag failed.");
   }                                                                                
-  metadata           (      metadata&& temp) noexcept : native_(std::move          (temp.native_)), managed_(std::move(temp.managed_))
+  metadata           (      metadata&& temp) noexcept : native_(std::move(temp.native_)), managed_(std::move(temp.managed_))
   {
     temp.native_ = nullptr;
   }
@@ -56,7 +61,7 @@ public:
     }
     return *this;
   }
-                         
+
   void          set_key          (const std::string&   key          )
   {
     FreeImage_SetTagKey(native_, key.c_str());
@@ -116,20 +121,18 @@ public:
   {
     return reinterpret_cast<const type*>(FreeImage_GetTagValue(native_));
   }
-          
+
   std::string   to_string        (metadata_model model) const
   {
     return FreeImage_TagToString(static_cast<FREE_IMAGE_MDMODEL>(model), native_, nullptr);
   }
 
-protected:
-  friend image;
-
-  explicit metadata(FITAG* native) : native_(native), managed_(false)
+  FITAG* native() const
   {
-    
+    return native_;
   }
 
+protected:
   FITAG* native_  ;
   bool   managed_ = true;
 };

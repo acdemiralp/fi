@@ -32,11 +32,7 @@ class multi_image;
 class image
 {
 public: 
-  explicit image  (
-    const std::array<std::size_t, 2>&  dimensions     ,                                           
-    type                               type           = type::bitmap, 
-    const std::size_t                  bits_per_pixel = 8, 
-    const std::array<std::size_t, 3>   rgb_mask       = {0ull, 0ull, 0ull})
+  explicit image  (                 const std::array<std::size_t, 2>& dimensions,                          type type = type::bitmap, const std::size_t bits_per_pixel = 8, const std::array<std::size_t, 3> rgb_mask = {0ull, 0ull, 0ull})
   : native_(FreeImage_AllocateT(
     static_cast<FREE_IMAGE_TYPE>(type), 
     static_cast<std::int32_t> (dimensions     [0]), 
@@ -50,12 +46,7 @@ public:
       throw std::runtime_error("FreeImage_AllocateT failed.");
   }
   template<typename color_type = std::array<std::uint8_t, 4>>
-  explicit image  (
-    const std::array<std::size_t , 2>& dimensions     , 
-    const color_type&                  color          ,
-    type                               type           = type::bitmap, 
-    const std::size_t                  bits_per_pixel = 8, 
-    const std::array<std::size_t, 3>   rgb_mask       = {0ull, 0ull, 0ull})
+  explicit image  (                 const std::array<std::size_t, 2>& dimensions, const color_type& color, type type = type::bitmap, const std::size_t bits_per_pixel = 8, const std::array<std::size_t, 3> rgb_mask = {0ull, 0ull, 0ull})
   : native_(FreeImage_AllocateExT(
     static_cast<FREE_IMAGE_TYPE>(type), 
     static_cast<std::int32_t> (dimensions     [0]), 
@@ -73,14 +64,7 @@ public:
       throw std::runtime_error("FreeImage_AllocateExT failed.");
   }
   template<typename data_type = std::uint8_t>
-  explicit image  (
-    data_type*                        data           , 
-    const std::array<std::size_t, 2>& dimensions     ,                                           
-    type                              type           = type::bitmap, 
-    const std::size_t                 bits_per_pixel = 8, 
-    const std::array<std::size_t, 3>  rgb_mask       = {0ull, 0ull, 0ull}, 
-    const bool                        shallow        = false, 
-    const bool                        top_down       = false) 
+  explicit image  (data_type* data, const std::array<std::size_t, 2>& dimensions, type type = type::bitmap                         , const std::size_t bits_per_pixel = 8, const std::array<std::size_t, 3> rgb_mask = {0ull, 0ull, 0ull}, const bool shallow = false, const bool top_down = false)
   : native_(FreeImage_ConvertFromRawBitsEx(
     !shallow                                           ,
     reinterpret_cast<std::uint8_t*>(data              ),
@@ -98,6 +82,7 @@ public:
     if (!native_)
       throw std::runtime_error("FreeImage_ConvertFromRawBitsEx failed.");
   }
+
   explicit image  (const std::string& filepath, const std::int32_t            native_flags = 0)
   {
     format_ = FreeImage_GetFileType(filepath.c_str(), 0);
@@ -110,9 +95,9 @@ public:
   }
   explicit image  (const memory&      memory  , const std::int32_t            native_flags = 0)
   {
-    format_ = FreeImage_GetFileTypeFromMemory(memory.native_, 0);
+    format_ = FreeImage_GetFileTypeFromMemory(memory.native(), 0);
 
-    native_ = FreeImage_LoadFromMemory(format_, memory.native_, native_flags);
+    native_ = FreeImage_LoadFromMemory(format_, memory.native(), native_flags);
     if (!native_)
       throw std::runtime_error("FreeImage_LoadFromMemory failed.");
   } 
@@ -132,6 +117,22 @@ public:
       throw std::runtime_error("FreeImage_Copy failed.");
     FreeImage_CloneMetadata(native_, that.native_);
   }
+
+  explicit image  (const image&       that    , const rectangle<std::size_t>& rectangle, bool is_view)
+  : native_ (FreeImage_CreateView(that.native_, static_cast<std::int32_t>(rectangle.left), static_cast<std::int32_t>(rectangle.top), static_cast<std::int32_t>(rectangle.right), static_cast<std::int32_t>(rectangle.bottom)))
+  , format_ (that.format_)
+  {
+    if (!native_)
+      throw std::runtime_error("FreeImage_CreateView failed.");
+    FreeImage_CloneMetadata(native_, that.native_);
+  }
+
+  explicit image(FIBITMAP* native) : native_(native), managed_(false)
+  {
+    if (!native_)
+      throw std::runtime_error("FIBITMAP is nullptr.");
+  }
+
   image           (const image&       that    ) 
   : native_(FreeImage_Clone(that.native_)), format_(that.format_)
   {
@@ -173,6 +174,8 @@ public:
   
   image                                    create_view                   (const rectangle<std::size_t>& rectangle)
   {
+    // TOFIX!
+    // Note: This image is not managed (its native representation will exist past destruction).
     return image(FreeImage_CreateView(
       native_, 
       static_cast<std::uint32_t>(rectangle.left  ), 
@@ -208,13 +211,8 @@ public:
   }
   void                                     to_memory                     (memory&            memory  , const std::int32_t native_flags = 0) const
   {
-    FreeImage_SaveToMemory(format_, native_, memory.native_, native_flags);
   }
-  
-  format                                   format                        () const
-  {
-    return fi::format(format_);
-  }                                                                       
+                                                                         
   type                                     type                          () const
   {
     return static_cast<fi::type>(FreeImage_GetImageType(native_));
@@ -376,6 +374,7 @@ public:
   }
   image                                    thumbnail                     () const
   {
+    // Note: This image is not managed (its native representation will exist past destruction).
     return image(FreeImage_GetThumbnail(native_));
   }
   BITMAPINFOHEADER*                        bitmap_info_header            () const
@@ -403,39 +402,39 @@ public:
     return {profile->data, static_cast<std::size_t>(profile->size)};
   }
   
-  void                                     convert_to_4_bits             ()
+  void                                     to_4_bits                     ()
   {
     replace(FreeImage_ConvertTo4Bits    (native_));
   }
-  void                                     convert_to_8_bits             ()
+  void                                     to_8_bits                     ()
   {
     replace(FreeImage_ConvertTo8Bits    (native_));
   }
-  void                                     convert_to_greyscale          ()
-  {
-    replace(FreeImage_ConvertToGreyscale(native_));
-  }
-  void                                     convert_to_16_bits_555        ()
+  void                                     to_16_bits_555                ()
   {
     replace(FreeImage_ConvertTo16Bits555(native_));
   }
-  void                                     convert_to_16_bits_565        ()
+  void                                     to_16_bits_565                ()
   {
     replace(FreeImage_ConvertTo16Bits565(native_));
   }
-  void                                     convert_to_24_bits            ()
+  void                                     to_24_bits                    ()
   {
     replace(FreeImage_ConvertTo24Bits   (native_));
   }
-  void                                     convert_to_32_bits            ()
+  void                                     to_32_bits                    ()
   {
     replace(FreeImage_ConvertTo32Bits   (native_));
   }
-  void                                     convert_to_standard           (               const bool scale_linear = true)
+  void                                     to_greyscale                  ()
+  {
+    replace(FreeImage_ConvertToGreyscale(native_));
+  }
+  void                                     to_standard                   (               const bool scale_linear = true)
   {
     replace(FreeImage_ConvertToStandardType(native_, scale_linear));
   }
-  void                                     convert_to_type               (fi::type type, const bool scale_linear = true)
+  void                                     to_type                       (fi::type type, const bool scale_linear = true)
   {
     replace(FreeImage_ConvertToType(native_, static_cast<FREE_IMAGE_TYPE>(type), scale_linear));
   }
@@ -614,7 +613,7 @@ public:
 
   void                                     set_metadata                  (metadata_model model, const fi::metadata& metadata)
   {
-    FreeImage_SetMetadata        (static_cast<FREE_IMAGE_MDMODEL>(model), native_, metadata.key().c_str(), metadata.native_);
+    FreeImage_SetMetadata        (static_cast<FREE_IMAGE_MDMODEL>(model), native_, metadata.key().c_str(), metadata.native());
   }
   void                                     set_metadata                  (metadata_model model, const std::string& key, const std::string& value)
   {
@@ -624,6 +623,7 @@ public:
   {
     FITAG* tag = nullptr;
     FreeImage_GetMetadata(static_cast<FREE_IMAGE_MDMODEL>(model), native_, key.c_str(), &tag);
+    // Note: This metadata is not managed (its native representation will exist past destruction).
     return fi::metadata(tag);
   }
   std::size_t                              metadata_size                 (metadata_model model)
@@ -636,6 +636,7 @@ public:
     auto   iterator = FreeImage_FindFirstMetadata(static_cast<FREE_IMAGE_MDMODEL>(model), native_, &tag);
     do 
     {
+      // Note: This metadata is not managed (its native representation will exist past destruction).
       const fi::metadata metadata(tag);
       callback(metadata);
     }
@@ -643,16 +644,17 @@ public:
     FreeImage_FindCloseMetadata(iterator);
   }
 
-protected:
-  friend multi_image;
-
-  explicit image  (FIBITMAP* native) : native_(native), managed_(false)
+  FIBITMAP* native() const
   {
-    if (!native_)
-      throw std::runtime_error("Unmanaged FIBITMAP is empty.");
+    return native_;
   }
-  
-  void     replace(FIBITMAP* native)
+  format    format() const
+  {
+    return fi::format(format_);
+  }
+
+protected:
+  void replace(FIBITMAP* native)
   {
     if (native_)
       FreeImage_Unload(native_);
@@ -665,6 +667,11 @@ protected:
   FREE_IMAGE_FORMAT format_  = FIF_UNKNOWN;
   bool              managed_ = true       ;
 };
+
+inline memory::memory(const image& image, const std::int32_t native_flags ) : memory()
+{
+  FreeImage_SaveToMemory(image.format().native, image.native(), native_, native_flags);
+}
 }
 
 #endif
