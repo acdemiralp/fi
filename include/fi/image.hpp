@@ -4,6 +4,7 @@
 #include <array>
 #include <cstddef>
 #include <cstdint>
+#include <functional>
 #include <stdexcept>
 #include <string>
 #include <utility>
@@ -22,6 +23,7 @@
 #include <fi/utility/span.hpp>
 #include <fi/format.hpp>
 #include <fi/memory.hpp>
+#include <fi/metadata.hpp>
 
 namespace fi
 {
@@ -120,6 +122,7 @@ public:
   {
     if (!native_)
       throw std::runtime_error(that.type() == type::complex ? "FreeImage_GetComplexChannel failed." : "FreeImage_GetChannel failed.");
+    FreeImage_CloneMetadata(native_, that.native_);
   }
   explicit image  (const image&       that    , const rectangle<std::size_t>& rectangle       )
   : native_ (FreeImage_Copy(that.native_, static_cast<std::int32_t>(rectangle.left), static_cast<std::int32_t>(rectangle.top), static_cast<std::int32_t>(rectangle.right), static_cast<std::int32_t>(rectangle.bottom)))
@@ -127,12 +130,14 @@ public:
   {
     if (!native_)
       throw std::runtime_error("FreeImage_Copy failed.");
+    FreeImage_CloneMetadata(native_, that.native_);
   }
   image           (const image&       that    ) 
   : native_(FreeImage_Clone(that.native_)), format_(that.format_)
   {
     if (!native_)
       throw std::runtime_error("FreeImage_Clone failed.");
+    FreeImage_CloneMetadata(native_, that.native_);
   }
   image           (      image&&      temp    ) noexcept 
   : native_(std::move(temp.native_)), format_(std::move(temp.format_)), managed_(std::move(temp.managed_))
@@ -151,6 +156,7 @@ public:
     managed_ = true;
     if (!native_)
       throw std::runtime_error("FreeImage_Clone failed.");
+    FreeImage_CloneMetadata(native_, that.native_);
     return *this;
   }
   image& operator=(      image&&      temp    ) noexcept
@@ -601,9 +607,40 @@ public:
       native_options));
   }
 
-  void                                     multigrid_poisson_solver      (const std::size_t iterations)
+  void                                     solve_multigrid_poisson_grid  (const std::size_t iterations)
   {
     replace(FreeImage_MultigridPoissonSolver(native_, static_cast<std::int32_t>(iterations)));
+  }
+
+  void                                     set_metadata                  (metadata_model model, const fi::metadata& metadata)
+  {
+    FreeImage_SetMetadata        (static_cast<FREE_IMAGE_MDMODEL>(model), native_, metadata.key().c_str(), metadata.native_);
+  }
+  void                                     set_metadata                  (metadata_model model, const std::string& key, const std::string& value)
+  {
+    FreeImage_SetMetadataKeyValue(static_cast<FREE_IMAGE_MDMODEL>(model), native_, key.c_str(), value.c_str());
+  }
+  fi::metadata                             metadata                      (metadata_model model, const std::string& key) const
+  {
+    FITAG* tag = nullptr;
+    FreeImage_GetMetadata(static_cast<FREE_IMAGE_MDMODEL>(model), native_, key.c_str(), &tag);
+    return fi::metadata(tag);
+  }
+  std::size_t                              metadata_size                 (metadata_model model)
+  {
+    return static_cast<std::size_t>(FreeImage_GetMetadataCount(static_cast<FREE_IMAGE_MDMODEL>(model), native_));
+  }
+  void                                     iterate_metadata              (metadata_model model, const std::function<void(const fi::metadata&)>& callback) const
+  {
+    FITAG* tag      = nullptr;
+    auto   iterator = FreeImage_FindFirstMetadata(static_cast<FREE_IMAGE_MDMODEL>(model), native_, &tag);
+    do 
+    {
+      const fi::metadata metadata(tag);
+      callback(metadata);
+    }
+    while (FreeImage_FindNextMetadata(iterator, &tag));
+    FreeImage_FindCloseMetadata(iterator);
   }
 
 protected:

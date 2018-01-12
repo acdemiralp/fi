@@ -17,6 +17,8 @@ set(PROJECT_SOURCES
   include/fi/enums/color_type.hpp
   include/fi/enums/dithering_mode.hpp
   include/fi/enums/filter.hpp
+  include/fi/enums/metadata_model.hpp
+  include/fi/enums/metadata_type.hpp
   include/fi/enums/quantization_mode.hpp
   include/fi/enums/type.hpp
   include/fi/utility/rectangle.hpp
@@ -26,8 +28,8 @@ set(PROJECT_SOURCES
   include/fi/image.hpp
   include/fi/jpeg.hpp
   include/fi/memory.hpp
+  include/fi/metadata.hpp
   include/fi/multi_image.hpp
-  include/fi/tag.hpp
 )
 include(assign_source_group)
 assign_source_group(${PROJECT_SOURCES})
