@@ -5,6 +5,7 @@
 #include <cstdint>
 #include <string>
 
+#define FREEIMAGE_COLORORDER 1
 #include <FreeImage.h>
 
 #include <fi/utility/rectangle.hpp>

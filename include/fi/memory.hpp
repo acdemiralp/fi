@@ -7,6 +7,7 @@
 #include <utility>
 #include <vector>
 
+#define FREEIMAGE_COLORORDER 1
 #include <FreeImage.h>
 
 #include <fi/utility/span.hpp>

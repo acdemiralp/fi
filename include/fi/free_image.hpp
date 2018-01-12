@@ -4,6 +4,7 @@
 #include <iostream>
 #include <string>
 
+#define FREEIMAGE_COLORORDER 1
 #include <FreeImage.h>
 
 namespace fi

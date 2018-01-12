@@ -1,6 +1,7 @@
 #ifndef FI_METADATA_TYPE_HPP_
 #define FI_METADATA_TYPE_HPP_
 
+#define FREEIMAGE_COLORORDER 1
 #include <FreeImage.h>
 
 namespace fi

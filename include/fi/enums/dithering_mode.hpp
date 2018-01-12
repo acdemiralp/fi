@@ -1,6 +1,7 @@
 #ifndef FI_DITHERING_MODE_HPP_
 #define FI_DITHERING_MODE_HPP_
 
+#define FREEIMAGE_COLORORDER 1
 #include <FreeImage.h>
 
 namespace fi

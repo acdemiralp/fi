@@ -21,7 +21,7 @@ namespace fi
 class multi_image
 {
 public:
-  explicit multi_image  (const std::string& filepath, const bool create = false, const bool read_only = false, const bool cache = false, const std::int32_t native_flags = 0) 
+  explicit multi_image  (const std::string&  filepath, const bool create = false, const bool read_only = false, const bool cache = false, const std::int32_t native_flags = 0) 
   {
     format_ = FreeImage_GetFileType(filepath.c_str(), 0);
     if (format_ == FIF_UNKNOWN)
@@ -31,7 +31,7 @@ public:
     if (!native_) 
       throw std::runtime_error("FreeImage_OpenMultiBitmap failed.");
   }
-  explicit multi_image  (const memory&      memory  ,                                                                                    const std::int32_t native_flags = 0)
+  explicit multi_image  (const memory&       memory  ,                                                                                    const std::int32_t native_flags = 0)
   {
     format_ = FreeImage_GetFileTypeFromMemory(memory.native_, 0);
 
@@ -100,8 +100,7 @@ public:
   }
   image             lock      (const std::size_t index)                             const
   {
-    if (index >= size())     throw std::out_of_range ("Index out of range.");
-    if (lock_state()[index]) throw std::runtime_error("Requested page is already locked.");
+    if (index >= size()) throw std::out_of_range ("Index out of range.");
     return image(FreeImage_LockPage(native_, static_cast<std::int32_t>(index)));
   }
   void              unlock    (const image& image, const bool changed = true)       const
