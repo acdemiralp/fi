@@ -445,7 +445,7 @@ public:
   
   // Saving functionality.
   template<typename data_type = std::uint8_t>
-  std::vector<data_type>                   to_raw                        (const bool top_down = false) const
+  std::vector<data_type>                   to_raw                        (const bool top_down = false)                                                                                                             const
   {
     std::vector<data_type> buffer(dimensions()[0] * pitch() / sizeof data_type);
     auto mask = color_mask();
@@ -460,7 +460,7 @@ public:
       top_down);
     return buffer;
   }
-  void                                     to_file                       (const std::string& filepath, const std::int32_t native_flags = 0) const
+  void                                     to_file                       (const std::string& filepath, const std::int32_t native_flags = 0)                                                                        const
   {
     FreeImage_Save(format_, native_, filepath.c_str(), native_flags);
   }
