@@ -15,8 +15,6 @@
 
 namespace fi
 {
-class image;
-
 class metadata
 {
 public:
@@ -92,42 +90,42 @@ public:
     FreeImage_SetTagValue(native_, value);
   }
 
-  std::string   key              () const
+  std::string   key              ()                                   const
   {
     return FreeImage_GetTagKey(native_);
   }
-  std::string   description      () const
+  std::string   description      ()                                   const
   {
     return FreeImage_GetTagDescription(native_);
   }
-  std::uint16_t id               () const
+  std::uint16_t id               ()                                   const
   {
     return FreeImage_GetTagID(native_);
   }
-  metadata_type type             () const
+  metadata_type type             ()                                   const
   {
     return static_cast<metadata_type>(FreeImage_GetTagType(native_));
   }
-  std::size_t   size             () const
+  std::size_t   size             ()                                   const
   {
     return static_cast<std::size_t>(FreeImage_GetTagCount(native_));
   }
-  std::size_t   size_in_bytes    () const
+  std::size_t   size_in_bytes    ()                                   const
   {
     return static_cast<std::size_t>(FreeImage_GetTagLength(native_));
   }
-  template<typename type>        
-  const type*   value            () const
+  template<typename type>                                             
+  const type*   value            ()                                   const
   {
     return reinterpret_cast<const type*>(FreeImage_GetTagValue(native_));
   }
 
-  std::string   to_string        (metadata_model model) const
+  std::string   to_string        (metadata_model model)               const
   {
     return FreeImage_TagToString(static_cast<FREE_IMAGE_MDMODEL>(model), native_, nullptr);
   }
 
-  FITAG* native() const
+  FITAG*        native           ()                                   const
   {
     return native_;
   }
