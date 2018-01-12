@@ -25,7 +25,7 @@ public:
   {
     format_ = FreeImage_GetFileType(filepath.c_str(), 0);
     if (format_ == FIF_UNKNOWN)
-      format_ = FreeImage_GetFIFFromFilename(filepath.c_str());
+        format_ = FreeImage_GetFIFFromFilename(filepath.c_str());
 
     native_ = FreeImage_OpenMultiBitmap(format_, filepath.c_str(), create, read_only, cache, native_flags);
     if (!native_) 
@@ -85,17 +85,17 @@ public:
     if (target >= size()) throw std::out_of_range("Target index out of range.");
     FreeImage_MovePage(native_, static_cast<std::int32_t>(target), static_cast<std::int32_t>(source));
   }
-                               
+
   std::vector<bool> lock_state ()                                                    const
   {
-    int locked_page_count;
-    FreeImage_GetLockedPageNumbers(native_, nullptr, &locked_page_count);
+    std::int32_t locked_page_count;
+    FreeImage_GetLockedPageNumbers(native_, nullptr            , &locked_page_count);
 
-    std::vector<int> locked_pages(static_cast<std::size_t>(locked_page_count));
+    std::vector<std::int32_t> locked_pages(static_cast<std::size_t>(locked_page_count));
     FreeImage_GetLockedPageNumbers(native_, locked_pages.data(), &locked_page_count);
 
     std::vector<bool> pages(size(), false);
-    std::for_each(locked_pages.begin(), locked_pages.end(), [&pages] (int page_index) { pages[page_index] = true; });
+    std::for_each(locked_pages.begin(), locked_pages.end(), [&pages] (std::int32_t page_index) { pages[page_index] = true; });
     return pages;
   }
   image             lock       (const std::size_t index)                             const
@@ -108,7 +108,7 @@ public:
   {
     FreeImage_UnlockPage(native_, image.native(), changed);
   }
-        
+
   FIMULTIBITMAP*    native     ()                                                    const
   {
     return native_;

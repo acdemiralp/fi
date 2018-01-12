@@ -547,12 +547,12 @@ public:
   template<typename color_type>
   void                                     apply_color_mapping           (span<color_type> source, span<color_type> target, const bool ignore_alpha = false, const bool two_way = false) const
   {
-    FreeImage_ApplyColorMapping       (native_, reinterpret_cast<RGBQUAD*>     (source.data), reinterpret_cast<RGBQUAD*>     (target.data), static_cast<unsigned>(source.size), ignore_alpha, two_way);
+    FreeImage_ApplyColorMapping       (native_, reinterpret_cast<RGBQUAD*>     (source.data), reinterpret_cast<RGBQUAD*>     (target.data), static_cast<std::uint32_t>(source.size), ignore_alpha, two_way);
   }
   template<typename index_type>
   void                                     apply_palette_index_mapping   (span<index_type> source, span<index_type> target, const bool ignore_alpha = false, const bool two_way = false) const
   {
-    FreeImage_ApplyPaletteIndexMapping(native_, reinterpret_cast<std::uint8_t*>(source.data), reinterpret_cast<std::uint8_t*>(target.data), static_cast<unsigned>(source.size),               two_way);
+    FreeImage_ApplyPaletteIndexMapping(native_, reinterpret_cast<std::uint8_t*>(source.data), reinterpret_cast<std::uint8_t*>(target.data), static_cast<std::uint32_t>(source.size),               two_way);
   }
 
   void                                     set_channel                   (color_channel channel, const image& image)

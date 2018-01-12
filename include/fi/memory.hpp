@@ -67,13 +67,13 @@ public:
   std::vector<type> read  (const std::size_t size)                                          const
   {
     std::vector<type> buffer(size);
-    FreeImage_ReadMemory(buffer.data(), static_cast<unsigned>(sizeof type), static_cast<unsigned>(buffer.size()), native_);
+    FreeImage_ReadMemory(buffer.data(), static_cast<std::uint32_t>(sizeof type), static_cast<std::uint32_t>(buffer.size()), native_);
     return buffer;
   }
   template<typename type = std::uint8_t>
   void              write (const span<type>& span)
   {
-    FreeImage_WriteMemory(span.data   , static_cast<unsigned>(sizeof type), static_cast<unsigned>(span.size)    , native_);
+    FreeImage_WriteMemory(span.data   , static_cast<std::uint32_t>(sizeof type), static_cast<std::uint32_t>(span.size)    , native_);
   }
   
   bool              seek  (const std::int32_t offset, const std::int32_t origin = SEEK_SET) const
