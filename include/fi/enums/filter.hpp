@@ -8,9 +8,9 @@ namespace fi
 {
 enum class filter
 {
-  box         = FILTER_BOX       ,
   bicubic     = FILTER_BICUBIC   ,
   bilinear    = FILTER_BILINEAR  ,
+  box         = FILTER_BOX       ,
   bspline     = FILTER_BSPLINE   ,
   catmull_rom = FILTER_CATMULLROM,
   lanczos_3   = FILTER_LANCZOS3

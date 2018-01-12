@@ -8,9 +8,9 @@ namespace fi
 {
 enum class quantization_mode
 {
-  xiaolin_wu           = FIQ_WUQUANT ,
+  lossless_fast_pseudo = FIQ_LFPQUANT,
   neural_network       = FIQ_NNQUANT ,
-  lossless_fast_pseudo = FIQ_LFPQUANT
+  xiaolin_wu           = FIQ_WUQUANT
 };
 }
 
