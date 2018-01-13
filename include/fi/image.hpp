@@ -175,7 +175,7 @@ public:
     FreeImage_Save(format_, native_, filepath.c_str(), native_flags);
   }
   
-  // Property access functionality.
+  // Property access / mutate functionality.
   std::array<std::size_t, 2>               dimensions                    ()                                                                                                                                        const
   {
     return {static_cast<std::size_t>(FreeImage_GetWidth(native_)), static_cast<std::size_t>(FreeImage_GetHeight(native_))};
@@ -217,6 +217,16 @@ public:
   {
     return static_cast<fi::color_type>(FreeImage_GetColorType(native_));
   }
+  
+  void                                     set_dots_per_meter            (const std::array<std::size_t, 2>& dots_per_meter)
+  {
+    FreeImage_SetDotsPerMeterX(native_, static_cast<std::uint32_t>(dots_per_meter[0]));
+    FreeImage_SetDotsPerMeterY(native_, static_cast<std::uint32_t>(dots_per_meter[1]));
+  }
+  std::array<std::size_t, 2>               dots_per_meter                ()                                                                                                                                        const
+  {
+    return {static_cast<std::size_t>(FreeImage_GetDotsPerMeterX(native_)), static_cast<std::size_t>(FreeImage_GetDotsPerMeterY(native_))};
+  }
 
   // Pixel access functionality.
   bool                                     empty                         ()                                                                                                                                        const
@@ -224,7 +234,7 @@ public:
     return FreeImage_HasPixels(native_) == 0;
   }
   template<typename type = std::uint8_t>                                                                                                                                                                      
-  span<type>                               data                          ()                                                                                                                                        const
+  span<type>                               pixels                        ()                                                                                                                                        const
   {
     return {reinterpret_cast<type*>(FreeImage_GetBits(native_)), dimensions()[0] * pitch() / sizeof type};
   }
@@ -250,144 +260,77 @@ public:
     return buffer;
   }
   
-  // Pixel color / transparency functionality. TODO
-  void                                     set_pixel_color               (const std::array<std::size_t, 2>& position, const std::array<std::uint8_t, 4>& color)
+  void                                     set_pixel_color               (const std::array<std::size_t, 2>& position, const std::array<std::uint8_t, 4>& color) // Underlying call enforces RGBQUAD use.
   {
-    RGBQUAD native_color;
-    native_color.rgbRed      = color[0];
-    native_color.rgbGreen    = color[1];
-    native_color.rgbBlue     = color[2];
-    native_color.rgbReserved = color[3];
-    FreeImage_SetPixelColor(native_, static_cast<std::uint32_t>(position[0]), static_cast<std::uint32_t>(position[1]), &native_color);
+    FreeImage_SetPixelColor(native_, static_cast<std::uint32_t>(position[0]), static_cast<std::uint32_t>(position[1]), reinterpret_cast<RGBQUAD*>(const_cast<std::uint8_t*>(color.data())));
   }
+  std::array<std::uint8_t, 4>              pixel_color                   (const std::array<std::size_t, 2>& position)                                                                                              const // Underlying call enforces RGBQUAD use.
+  {
+    std::array<std::uint8_t, 4> color;
+    FreeImage_GetPixelColor(native_, static_cast<std::uint32_t>(position[0]), static_cast<std::uint32_t>(position[1]), reinterpret_cast<RGBQUAD*>(color.data()));
+    return color;
+  }                                                                                                                                                                                                                  
   void                                     set_pixel_palette_index       (const std::array<std::size_t, 2>& position, std::uint8_t index)
   {
     FreeImage_SetPixelIndex(native_, static_cast<std::uint32_t>(position[0]), static_cast<std::uint32_t>(position[1]), &index);
-  }
-  void                                     set_dots_per_meter            (const std::array<std::size_t, 2>& dots_per_meter)
+  }                                                                 
+  std::uint8_t                             pixel_palette_index           (const std::array<std::size_t, 2>& position)                                                                                              const
   {
-    FreeImage_SetDotsPerMeterX(native_, static_cast<std::uint32_t>(dots_per_meter[0]));
-    FreeImage_SetDotsPerMeterY(native_, static_cast<std::uint32_t>(dots_per_meter[1]));
-  }
-  void                                     set_palette                   (const span<std::array<std::uint8_t, 4>> palette)
+    std::uint8_t index;
+    FreeImage_GetPixelIndex(native_, static_cast<std::uint32_t>(position[0]), static_cast<std::uint32_t>(position[1]), &index);
+    return       index;
+  }    
+
+  // Color / transparency functionality.
+  span<std::array<std::uint8_t, 4>>        palette                       () // Underlying call enforces RGBQUAD use.
   {
-    const auto native_palette = FreeImage_GetPalette(native_);
-    for(auto i = 0; i < palette.size; ++i)
-    {
-      native_palette[i].rgbRed      = palette.data[i][0];
-      native_palette[i].rgbGreen    = palette.data[i][1];
-      native_palette[i].rgbBlue     = palette.data[i][2];
-      native_palette[i].rgbReserved = palette.data[i][3];
-    }
+    return {reinterpret_cast<std::array<std::uint8_t, 4>*>(FreeImage_GetPalette(native_)), static_cast<std::size_t>(FreeImage_GetColorsUsed(native_))};
   }
+  
   void                                     set_transparent               (const bool transparent)
   {
     FreeImage_SetTransparent(native_, transparent);
   }
-  void                                     set_transparent_palette_index (const std::size_t index)
-  {
-    FreeImage_SetTransparentIndex(native_, static_cast<std::int32_t>(index));
-  }
-  void                                     set_transparency_table        (const fi::span<std::uint8_t> span)
-  {
-    FreeImage_SetTransparencyTable(native_, span.data, static_cast<std::int32_t>(span.size));
-  }
-
-  std::array<std::uint8_t, 4>              pixel_color                   (const std::array<std::size_t, 2>& position) const
-  {
-    RGBQUAD native_color; 
-    FreeImage_GetPixelColor(native_, static_cast<std::uint32_t>(position[0]), static_cast<std::uint32_t>(position[1]), &native_color);
-    return {native_color.rgbRed, native_color.rgbGreen, native_color.rgbBlue, native_color.rgbReserved};
-  }         
-  std::uint8_t                             pixel_palette_index           (const std::array<std::size_t, 2>& position) const
-  {
-    std::uint8_t index;
-    FreeImage_GetPixelIndex(native_, static_cast<std::uint32_t>(position[0]), static_cast<std::uint32_t>(position[1]), &index);
-    return index;
-  }    
-  std::array<std::size_t, 2>               dots_per_meter                () const
-  {
-    return {static_cast<std::size_t>(FreeImage_GetDotsPerMeterX(native_)), static_cast<std::size_t>(FreeImage_GetDotsPerMeterY(native_))};
-  }
-  std::vector<std::array<std::uint8_t, 4>> palette                       () const
-  {
-    std::vector<std::array<std::uint8_t, 4>> palette         (FreeImage_GetColorsUsed(native_));
-    const auto                               native_palette = FreeImage_GetPalette   (native_);
-    for (auto i = 0; i < palette.size(); ++i)
-      palette[i] = {native_palette[i].rgbRed, native_palette[i].rgbGreen, native_palette[i].rgbBlue, native_palette[i].rgbReserved};
-    return palette;
-  }
-  bool                                     transparent                   () const
+  bool                                     transparent                   ()                                                                                                                                        const
   {
     return FreeImage_IsTransparent(native_) != 0;
   }
-  std::size_t                              transparent_palette_index     () const
+  void                                     set_transparent_palette_index (const std::uint8_t index)
   {
-    return static_cast<std::size_t>(FreeImage_GetTransparentIndex(native_));
+    FreeImage_SetTransparentIndex(native_, static_cast<std::int32_t>(index));
+  }                                                                                                       
+  std::uint8_t                             transparent_palette_index     ()                                                                                                                                        const
+  {
+    return static_cast<std::uint8_t>(FreeImage_GetTransparentIndex(native_));
   }
-  span<std::uint8_t>                       transparency_table            () const
+  void                                     set_transparency_table        (const span<std::uint8_t>& table)
+  {
+    FreeImage_SetTransparencyTable(native_, table.data, static_cast<std::int32_t>(table.size));
+  }                                                                                                
+  span<std::uint8_t>                       transparency_table            ()                                                                                                                                        const
   {
     return {FreeImage_GetTransparencyTable(native_), static_cast<std::size_t>(FreeImage_GetTransparencyCount(native_))};
   }
-
-  void                                     set_background_color          (const std::array<std::uint8_t, 4>& color)
+  
+  void                                     set_background_color         (const std::array<std::uint8_t, 4>& color) // Underlying call enforces RGBQUAD use.
   {
-    RGBQUAD native_color;
-    native_color.rgbRed      = color[0]; 
-    native_color.rgbGreen    = color[1]; 
-    native_color.rgbBlue     = color[2]; 
-    native_color.rgbReserved = color[3];
-    FreeImage_SetBackgroundColor(native_, &native_color);
+    FreeImage_SetBackgroundColor(native_, reinterpret_cast<RGBQUAD*>(const_cast<std::uint8_t*>(color.data())));
+  }                                                                          
+  std::array<std::uint8_t, 4>              background_color             ()                                                                                                                                        const // Underlying call enforces RGBQUAD use.                                                                                                                                       const // Underlying call enforces RGBQUAD use.
+  {
+    std::array<std::uint8_t, 4> color;
+    FreeImage_GetBackgroundColor(native_, reinterpret_cast<RGBQUAD*>(color.data()));
+    return color;
   }
-  void                                     clear_background_color        ()
+  void                                     reset_background_color       ()
   {
     FreeImage_SetBackgroundColor(native_, nullptr);
-  }
-  std::array<std::uint8_t, 4>              background_color              () const
-  {
-    RGBQUAD native_color;
-    FreeImage_GetBackgroundColor(native_, &native_color);
-    return {native_color.rgbRed, native_color.rgbGreen, native_color.rgbBlue, native_color.rgbReserved};
-  }
-  bool                                     has_background_color          () const
+  }                                                     
+  bool                                     has_background_color         ()                                                                                                                                        const
   {
     return FreeImage_HasBackgroundColor(native_) != 0;
   }
-  template<typename color_type>
-  void                                     fill_background               (const color_type& color)
-  {
-    RGBQUAD native_color;
-    native_color.rgbRed      = color[0];
-    native_color.rgbGreen    = color[1];
-    native_color.rgbBlue     = color[2];
-    native_color.rgbReserved = color[3];
-    FreeImage_FillBackground(native_, &native_color, 0);
-  }
-  template<typename color_type>
-  void                                     apply_color_mapping           (const span<color_type>& source, const span<color_type>& target, const bool ignore_alpha = false, const bool two_way = false) const
-  {
-    FreeImage_ApplyColorMapping       (native_, reinterpret_cast<RGBQUAD*>     (source.data), reinterpret_cast<RGBQUAD*>     (target.data), static_cast<std::uint32_t>(source.size), ignore_alpha, two_way);
-  }
-  template<typename index_type>
-  void                                     apply_palette_index_mapping   (const span<index_type>& source, const span<index_type>& target, const bool ignore_alpha = false, const bool two_way = false) const
-  {
-    FreeImage_ApplyPaletteIndexMapping(native_, reinterpret_cast<std::uint8_t*>(source.data), reinterpret_cast<std::uint8_t*>(target.data), static_cast<std::uint32_t>(source.size),               two_way);
-  }
   
-  void                                     apply_background_color        (const std::array<std::uint8_t, 4>& background_color)
-  {
-    RGBQUAD native_color;
-    native_color.rgbRed      = background_color[0];
-    native_color.rgbGreen    = background_color[1];
-    native_color.rgbBlue     = background_color[2];
-    native_color.rgbReserved = background_color[3];
-    replace(FreeImage_Composite(native_, false, &native_color, nullptr));
-  }
-  void                                     apply_background_image        (const image&                       background_image)
-  {
-    replace(FreeImage_Composite(native_, true, nullptr, background_image.native_));
-  } 
-
   // Adjustment functionality.    
   void                                     adjust                        (                       const double brightness, const double contrast, const double gamma, const bool invert = false)                    const
   {
@@ -435,6 +378,20 @@ public:
   {
     FreeImage_PreMultiplyWithAlpha(native_);
   }
+  template<typename color_type = std::array<std::uint8_t, 4>>
+  void                                     fill                          (const color_type& color, const std::int32_t native_options = 0)
+  {
+    FreeImage_FillBackground(native_, &color, native_options);
+  }
+  template<typename color_type = std::array<std::uint8_t, 4>>
+  void                                     apply_color_mapping           (const span<color_type>&   source, const span<color_type>&   target, const bool ignore_alpha = false, const bool two_way = false) // Underlying call enforces RGBQUAD use. TODO: Make span of array of 4 bytes.
+  {
+    FreeImage_ApplyColorMapping(native_, reinterpret_cast<RGBQUAD*>(source.data), reinterpret_cast<RGBQUAD*>(target.data), static_cast<std::uint32_t>(source.size), ignore_alpha, two_way);
+  }
+  void                                     apply_palette_index_mapping   (const span<std::uint8_t>& source, const span<std::uint8_t>& target,                                  const bool two_way = false)
+  {
+    FreeImage_ApplyPaletteIndexMapping(native_, source.data, target.data, static_cast<std::uint32_t>(source.size), two_way);
+  }
   void                                     apply_overlay                 (const image& image, const std::array<std::size_t, 2>& position, const std::size_t alpha = 255)
   {
     FreeImage_Paste(native_, image.native_, static_cast<std::int32_t>(position[0]), static_cast<std::int32_t>(position[1]), static_cast<std::int32_t>(alpha));
@@ -445,8 +402,20 @@ public:
       ? FreeImage_SetComplexChannel(native_, image.native_, static_cast<FREE_IMAGE_COLOR_CHANNEL>(channel)) 
       : FreeImage_SetChannel       (native_, image.native_, static_cast<FREE_IMAGE_COLOR_CHANNEL>(channel));
   }
-
+  
   // Post processing functionality (replacing).
+  void                                     apply_checkerboard_background ()
+  {
+    replace(FreeImage_Composite(native_));
+  }
+  void                                     apply_background              (const std::array<std::uint8_t, 4>& color) // Underlying call enforces RGBQUAD use.
+  {
+    replace(FreeImage_Composite(native_, false, reinterpret_cast<RGBQUAD*>(const_cast<std::uint8_t*>(color.data())), nullptr));
+  }
+  void                                     apply_background              (const image&                       image)
+  {
+    replace(FreeImage_Composite(native_, false, nullptr, image.native_));
+  }
   void                                     threshold                     (const std::uint8_t threshold)
   {
     replace(FreeImage_Threshold(native_, threshold));
@@ -489,7 +458,7 @@ public:
   {
     replace(FreeImage_Rotate(native_, angle, nullptr));
   } 
-  template<typename color_type>
+  template<typename color_type = std::array<std::uint8_t, 4>>
   void                                     rotate                        (const double angle, const color_type& background_color)
   {
     replace(FreeImage_Rotate(native_, angle, &background_color));
@@ -499,28 +468,28 @@ public:
     replace(FreeImage_RotateEx(native_, angle, 0.0, 0.0, origin[0], origin[1], use_mask));
   }                                                                 
   
-  // Resizing functionality (replacing).
-  void                                     resize                        (const std::array<std::size_t, 2>& target_size                                         , filter filter = filter::catmull_rom)
+  // Resize functionality (replacing).
+  void                                     resize                        (const std::array<std::size_t, 2>& target_dimensions                                         , filter filter = filter::catmull_rom)
   {
     replace(FreeImage_Rescale(
-      native_                                       , 
-      static_cast<std::int32_t>     (target_size[0]), 
-      static_cast<std::int32_t>     (target_size[1]), 
-      static_cast<FREE_IMAGE_FILTER>(filter        )));
+      native_                                             , 
+      static_cast<std::int32_t>     (target_dimensions[0]), 
+      static_cast<std::int32_t>     (target_dimensions[1]), 
+      static_cast<FREE_IMAGE_FILTER>(filter              )));
   }
-  void                                     resize_rectangle              (const std::array<std::size_t, 2>& target_size, const rectangle<std::size_t>& rectangle, filter filter = filter::catmull_rom)
+  void                                     resize_rectangle              (const std::array<std::size_t, 2>& target_dimensions, const rectangle<std::size_t>& rectangle, filter filter = filter::catmull_rom)
   {
     replace(FreeImage_RescaleRect(
-      native_                                         , 
-      static_cast<std::int32_t>     (target_size[0]  ), 
-      static_cast<std::int32_t>     (target_size[1]  ), 
-      static_cast<std::int32_t>     (rectangle.left  ), 
-      static_cast<std::int32_t>     (rectangle.top   ), 
-      static_cast<std::int32_t>     (rectangle.right ), 
-      static_cast<std::int32_t>     (rectangle.bottom), 
-      static_cast<FREE_IMAGE_FILTER>(filter          )));
+      native_                                             , 
+      static_cast<std::int32_t>     (target_dimensions[0]), 
+      static_cast<std::int32_t>     (target_dimensions[1]), 
+      static_cast<std::int32_t>     (rectangle.left      ), 
+      static_cast<std::int32_t>     (rectangle.top       ), 
+      static_cast<std::int32_t>     (rectangle.right     ), 
+      static_cast<std::int32_t>     (rectangle.bottom    ), 
+      static_cast<FREE_IMAGE_FILTER>(filter              )));
   }
-  template<typename color_type>
+  template<typename color_type = std::array<std::uint8_t, 4>>
   void                                     resize_canvas                 (const rectangle<std::int32_t>& delta, const color_type& background_color, const std::int32_t native_options = 0)
   {
     replace(FreeImage_EnlargeCanvas(
@@ -530,7 +499,7 @@ public:
       delta.right      , 
       delta.bottom     ,
       &background_color,
-      native_options));
+      native_options   ));
   }
 
   // Conversion functionality (replacing).
