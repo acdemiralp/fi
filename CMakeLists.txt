@@ -14,6 +14,7 @@ set(PROJECT_SOURCES
   cmake/import_library.cmake
   
   include/fi/enums/color_channel.hpp
+  include/fi/enums/color_mask.hpp
   include/fi/enums/color_type.hpp
   include/fi/enums/dithering_mode.hpp
   include/fi/enums/filter.hpp
@@ -21,6 +22,7 @@ set(PROJECT_SOURCES
   include/fi/enums/metadata_type.hpp
   include/fi/enums/quantization_mode.hpp
   include/fi/enums/type.hpp
+  include/fi/utility/bitset_enum.hpp
   include/fi/utility/rectangle.hpp
   include/fi/utility/span.hpp
   include/fi/format.hpp

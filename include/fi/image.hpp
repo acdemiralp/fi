@@ -14,10 +14,12 @@
 #include <FreeImage.h>
 
 #include <fi/enums/color_channel.hpp>
+#include <fi/enums/color_mask.hpp>
 #include <fi/enums/color_type.hpp>
 #include <fi/enums/dithering_mode.hpp>
 #include <fi/enums/filter.hpp>
 #include <fi/enums/quantization_mode.hpp>
+#include <fi/enums/metadata_model.hpp>
 #include <fi/enums/type.hpp>
 #include <fi/utility/rectangle.hpp>
 #include <fi/utility/span.hpp>
@@ -27,8 +29,6 @@
 
 namespace fi
 {
-class multi_image;
-
 class image
 {
 public: 
@@ -82,7 +82,6 @@ public:
     if (!native_)
       throw std::runtime_error("FreeImage_ConvertFromRawBitsEx failed.");
   }
-
   explicit image  (const std::string& filepath, const std::int32_t            native_flags = 0)
   {
     format_ = FreeImage_GetFileType(filepath.c_str(), 0);
@@ -125,14 +124,12 @@ public:
     if (!native_)
       throw std::runtime_error("FreeImage_CreateView failed.");
     FreeImage_CloneMetadata(native_, that.native_);
-  }
-  
+  }  
   explicit image(FIBITMAP* native) : native_(native), managed_(false)
   {
     if (!native_)
       throw std::runtime_error("FIBITMAP is nullptr.");
   }
-
   image           (const image&       that    ) 
   : native_(FreeImage_Clone(that.native_)), format_(that.format_)
   {
@@ -172,197 +169,6 @@ public:
     return *this;
   }
   
-  bool                                     has_pixels                    () const
-  {
-    return FreeImage_HasPixels(native_) != 0;
-  }                                                                  
-  type                                     type                          () const
-  {
-    return static_cast<fi::type>(FreeImage_GetImageType(native_));
-  }                                                                        
-  std::uint8_t*                            data                          () const
-  {
-    return FreeImage_GetBits(native_);
-  }
-  std::uint8_t*                            scan_line                     (const std::size_t scan_line) const
-  {
-    return FreeImage_GetScanLine(native_, static_cast<std::int32_t>(scan_line));
-  }                                                  
-  void                                     set_pixel_palette_index       (const std::array<std::size_t, 2>& position, std::uint8_t index)
-  {
-    FreeImage_SetPixelIndex(native_, static_cast<std::uint32_t>(position[0]), static_cast<std::uint32_t>(position[1]), &index);
-  }
-  std::uint8_t                             pixel_palette_index           (const std::array<std::size_t, 2>& position) const
-  {
-    std::uint8_t index;
-    FreeImage_GetPixelIndex(native_, static_cast<std::uint32_t>(position[0]), static_cast<std::uint32_t>(position[1]), &index);
-    return index;
-  }
-  void                                     set_pixel_color               (const std::array<std::size_t, 2>& position, const std::array<std::uint8_t, 4>& color)
-  {
-    RGBQUAD native_color;
-    native_color.rgbRed      = color[0];
-    native_color.rgbGreen    = color[1];
-    native_color.rgbBlue     = color[2];
-    native_color.rgbReserved = color[3];
-    FreeImage_SetPixelColor(native_, static_cast<std::uint32_t>(position[0]), static_cast<std::uint32_t>(position[1]), &native_color);
-  }
-  std::array<std::uint8_t, 4>              pixel_color                   (const std::array<std::size_t, 2>& position) const
-  {
-    RGBQUAD native_color; 
-    FreeImage_GetPixelColor(native_, static_cast<std::uint32_t>(position[0]), static_cast<std::uint32_t>(position[1]), &native_color);
-    return {native_color.rgbRed, native_color.rgbGreen, native_color.rgbBlue, native_color.rgbReserved};
-  }                                                                      
-  std::size_t                              bits_per_pixel                () const
-  {
-    return static_cast<std::size_t>(FreeImage_GetBPP(native_));
-  }
-  std::array<std::size_t, 2>               dimensions                    () const
-  {
-    return {static_cast<std::size_t>(FreeImage_GetWidth(native_)), static_cast<std::size_t>(FreeImage_GetHeight(native_))};
-  }
-  std::size_t                              bytes_per_line                () const
-  {
-    return static_cast<std::size_t>(FreeImage_GetLine(native_));
-  }
-  std::size_t                              pitch                         () const
-  {
-    return static_cast<std::size_t>(FreeImage_GetPitch(native_));
-  }
-  std::size_t                              device_independent_size       () const
-  {
-    return static_cast<std::size_t>(FreeImage_GetDIBSize(native_));
-  }
-  std::size_t                              size                          () const
-  {
-    return static_cast<std::size_t>(FreeImage_GetMemorySize(native_));
-  }
-  void                                     set_palette                   (const span<std::array<std::uint8_t, 4>> palette)
-  {
-    const auto native_palette = FreeImage_GetPalette(native_);
-    for(auto i = 0; i < palette.size; ++i)
-    {
-      native_palette[i].rgbRed      = palette.data[i][0];
-      native_palette[i].rgbGreen    = palette.data[i][1];
-      native_palette[i].rgbBlue     = palette.data[i][2];
-      native_palette[i].rgbReserved = palette.data[i][3];
-    }
-  }
-  std::vector<std::array<std::uint8_t, 4>> palette                       () const
-  {
-    const auto native_palette = FreeImage_GetPalette(native_);
-    std::vector<std::array<std::uint8_t, 4>> palette(palette_size());
-    for (auto i = 0; i < palette.size(); ++i)
-      palette[i] = {native_palette[i].rgbRed, native_palette[i].rgbGreen, native_palette[i].rgbBlue, native_palette[i].rgbReserved};
-    return palette;
-  } 
-  std::size_t                              palette_size                  () const
-  {
-    return static_cast<std::size_t>(FreeImage_GetColorsUsed(native_));
-  }
-  void                                     set_dots_per_meter            (const std::array<std::size_t, 2>& dots_per_meter)
-  {
-    FreeImage_SetDotsPerMeterX(native_, static_cast<std::uint32_t>(dots_per_meter[0]));
-    FreeImage_SetDotsPerMeterY(native_, static_cast<std::uint32_t>(dots_per_meter[1]));
-  }
-  std::array<std::size_t, 2>               dots_per_meter                () const
-  {
-    return {static_cast<std::size_t>(FreeImage_GetDotsPerMeterX(native_)), static_cast<std::size_t>(FreeImage_GetDotsPerMeterY(native_))};
-  }
-  color_type                               color_type                    () const
-  {
-    return static_cast<fi::color_type>(FreeImage_GetColorType(native_));
-  }
-  std::array<std::size_t, 3>               color_mask                    () const
-  {
-    return {
-      static_cast<std::size_t>(FreeImage_GetRedMask  (native_)), 
-      static_cast<std::size_t>(FreeImage_GetGreenMask(native_)),
-      static_cast<std::size_t>(FreeImage_GetBlueMask (native_))};
-  }
-  void                                     set_transparent               (const bool transparent)
-  {
-    FreeImage_SetTransparent(native_, transparent);
-  }
-  bool                                     transparent                   () const
-  {
-    return FreeImage_IsTransparent(native_) != 0;
-  }
-  void                                     set_transparency_table        (const fi::span<std::uint8_t> span)
-  {
-    FreeImage_SetTransparencyTable(native_, span.data, static_cast<std::int32_t>(span.size));
-  }
-  span<std::uint8_t>                       transparency_table            () const
-  {
-    return {FreeImage_GetTransparencyTable(native_), static_cast<std::size_t>(FreeImage_GetTransparencyCount(native_))};
-  }
-  void                                     set_transparent_palette_index (const std::size_t index)
-  {
-    FreeImage_SetTransparentIndex(native_, static_cast<std::int32_t>(index));
-  }
-  std::size_t                              transparent_palette_index     () const
-  {
-    return static_cast<std::size_t>(FreeImage_GetTransparentIndex(native_));
-  }
-  void                                     set_background_color          (const std::array<std::uint8_t, 4>& color)
-  {
-    RGBQUAD native_color;
-    native_color.rgbRed      = color[0]; 
-    native_color.rgbGreen    = color[1]; 
-    native_color.rgbBlue     = color[2]; 
-    native_color.rgbReserved = color[3];
-    FreeImage_SetBackgroundColor(native_, &native_color);
-  }
-  std::array<std::uint8_t, 4>              background_color              () const
-  {
-    RGBQUAD native_color;
-    FreeImage_GetBackgroundColor(native_, &native_color);
-    return {native_color.rgbRed, native_color.rgbGreen, native_color.rgbBlue, native_color.rgbReserved};
-  }
-  bool                                     has_background_color          () const
-  {
-    return FreeImage_HasBackgroundColor(native_) != 0;
-  }
-  void                                     set_thumbnail                 (const std::size_t size, const bool convert = true)
-  {
-    const auto thumbnail = FreeImage_MakeThumbnail(native_, static_cast<std::int32_t>(size), convert);
-    FreeImage_SetThumbnail(native_, thumbnail);
-    FreeImage_Unload      (thumbnail);
-  }
-  void                                     clear_thumbnail               ()
-  {
-    FreeImage_SetThumbnail(native_, nullptr);
-  }
-  image                                    thumbnail                     () const
-  {
-    // Note: This image is not managed (its native representation will exist past destruction).
-    return image(FreeImage_GetThumbnail(native_));
-  }
-  BITMAPINFOHEADER*                        bitmap_info_header            () const
-  {
-    return FreeImage_GetInfoHeader(native_);
-  }
-  BITMAPINFO*                              bitmap_info                   () const
-  {
-    return FreeImage_GetInfo(native_);
-  }
-  
-  std::array<unsigned long, 256>           histogram                     (color_channel channel)
-  {
-    std::array<unsigned long, 256> histogram_native;
-    FreeImage_GetHistogram(native_, histogram_native.data(), static_cast<FREE_IMAGE_COLOR_CHANNEL>(channel));
-    return histogram_native;
-  }
-  template<typename color_type>
-  void                                     apply_color_mapping           (span<color_type> source, span<color_type> target, const bool ignore_alpha = false, const bool two_way = false) const
-  {
-    FreeImage_ApplyColorMapping       (native_, reinterpret_cast<RGBQUAD*>     (source.data), reinterpret_cast<RGBQUAD*>     (target.data), static_cast<std::uint32_t>(source.size), ignore_alpha, two_way);
-  }
-  template<typename index_type>
-  void                                     apply_palette_index_mapping   (span<index_type> source, span<index_type> target, const bool ignore_alpha = false, const bool two_way = false) const
-  {
-    FreeImage_ApplyPaletteIndexMapping(native_, reinterpret_cast<std::uint8_t*>(source.data), reinterpret_cast<std::uint8_t*>(target.data), static_cast<std::uint32_t>(source.size),               two_way);
-  }
   void                                     set_channel                   (color_channel channel, const image& image)
   {
     type() == type::complex 
@@ -385,8 +191,19 @@ public:
   void                                     composite                     (const image&                       background_image)
   {
     replace(FreeImage_Composite(native_, true, nullptr, background_image.native_));
+  } 
+  template<typename color_type = std::array<std::uint8_t, 4>>
+  void                                     resize_canvas                 (const rectangle<std::int32_t>& rectangle, const color_type& color, const std::int32_t native_options = 0)
+  {
+    replace(FreeImage_EnlargeCanvas(
+      native_         , 
+      rectangle.left  ,
+      rectangle.top   , 
+      rectangle.right , 
+      rectangle.bottom,
+      &color[0]       ,
+      native_options));
   }
-  
   void                                     transform                     (const double angle, const std::array<double, 2>& translation, const std::array<double, 2>& rotation_origin, const bool use_mask = false)
   {
     replace(FreeImage_RotateEx(native_, angle, translation[0], translation[1], rotation_origin[0], rotation_origin[1], use_mask));
@@ -421,33 +238,74 @@ public:
       static_cast<FREE_IMAGE_FILTER>(filter                 )));
   }
   
-  void                                     fill_background               (const std::array<std::uint8_t, 4>& color)
+  // Save functionality.
+  void                                     save                          (const std::string& filepath, const std::int32_t native_flags = 0)                                                                        const
   {
-    RGBQUAD native_color;
-    native_color.rgbRed      = color[0];
-    native_color.rgbGreen    = color[1];
-    native_color.rgbBlue     = color[2];
-    native_color.rgbReserved = color[3];
-    FreeImage_FillBackground(native_, &native_color, 0);
-  }
-  template<typename color_type = std::array<std::uint8_t, 4>>
-  void                                     resize_canvas                 (const rectangle<std::int32_t>& rectangle, const color_type& color, const std::int32_t native_options = 0)
-  {
-    replace(FreeImage_EnlargeCanvas(
-      native_         , 
-      rectangle.left  ,
-      rectangle.top   , 
-      rectangle.right , 
-      rectangle.bottom,
-      &color[0]       ,
-      native_options));
+    FreeImage_Save(format_, native_, filepath.c_str(), native_flags);
   }
   
-  // Saving functionality.
-  template<typename data_type = std::uint8_t>
-  std::vector<data_type>                   to_raw                        (const bool top_down = false)                                                                                                             const
+  // Property access functionality.
+  std::array<std::size_t, 2>               dimensions                    ()                                                                                                                                        const
   {
-    std::vector<data_type> buffer(dimensions()[0] * pitch() / sizeof data_type);
+    return {static_cast<std::size_t>(FreeImage_GetWidth(native_)), static_cast<std::size_t>(FreeImage_GetHeight(native_))};
+  }
+  type                                     type                          ()                                                                                                                                        const
+  {
+    return static_cast<fi::type>(FreeImage_GetImageType(native_));
+  }
+  std::size_t                              bits_per_pixel                ()                                                                                                                                        const
+  {
+    return static_cast<std::size_t>(FreeImage_GetBPP(native_));
+  }
+  std::array<color_mask, 3>                color_mask                    ()                                                                                                                                        const
+  {
+    return 
+    {
+      static_cast<fi::color_mask>(FreeImage_GetRedMask  (native_)), 
+      static_cast<fi::color_mask>(FreeImage_GetGreenMask(native_)),
+      static_cast<fi::color_mask>(FreeImage_GetBlueMask (native_))
+    };
+  }
+  std::size_t                              size                          ()                                                                                                                                        const
+  {
+    return static_cast<std::size_t>(FreeImage_GetMemorySize(native_));
+  }
+  std::size_t                              line_size                     ()                                                                                                                                        const
+  {
+    return static_cast<std::size_t>(FreeImage_GetLine(native_));
+  }
+  std::size_t                              bitmap_size                   ()                                                                                                                                        const
+  {
+    return static_cast<std::size_t>(FreeImage_GetDIBSize(native_));
+  }
+  std::size_t                              pitch                         ()                                                                                                                                        const
+  {
+    return static_cast<std::size_t>(FreeImage_GetPitch(native_));
+  }
+  color_type                               color_type                    ()                                                                                                                                        const
+  {
+    return static_cast<fi::color_type>(FreeImage_GetColorType(native_));
+  }
+
+  // Pixel access functionality.
+  bool                                     empty                         ()                                                                                                                                        const
+  {
+    return FreeImage_HasPixels(native_) == 0;
+  }
+  template<typename type = std::uint8_t>                                                                                                                                                                      
+  span<type>                               data                          ()                                                                                                                                        const
+  {
+    return {reinterpret_cast<type*>(FreeImage_GetBits(native_)), dimensions()[0] * pitch() / sizeof type};
+  }
+  template<typename type = std::uint8_t>                                                                                                                                                                      
+  span<type>                               line                          (const std::size_t index)                                                                                                                 const
+  {
+    return {reinterpret_cast<type*>(FreeImage_GetScanLine(native_, static_cast<std::int32_t>(index))), pitch() / sizeof type};
+  }
+  template<typename type = std::uint8_t>                                                                                                                                                                      
+  std::vector<type>                        to_vector                     (const bool bottom_up = true)                                                                                                             const 
+  {
+    std::vector<type> buffer(dimensions()[0] * pitch() / sizeof type);
     auto mask = color_mask();
     FreeImage_ConvertToRawBits(
       reinterpret_cast<std::uint8_t*>(buffer.data()),
@@ -457,12 +315,133 @@ public:
       static_cast<std::uint32_t>(mask[0]),
       static_cast<std::uint32_t>(mask[1]),
       static_cast<std::uint32_t>(mask[2]),
-      top_down);
+      !bottom_up);
     return buffer;
   }
-  void                                     to_file                       (const std::string& filepath, const std::int32_t native_flags = 0)                                                                        const
+  
+  // Pixel color / transparency functionality.
+  void                                     set_pixel_color               (const std::array<std::size_t, 2>& position, const std::array<std::uint8_t, 4>& color)
   {
-    FreeImage_Save(format_, native_, filepath.c_str(), native_flags);
+    RGBQUAD native_color;
+    native_color.rgbRed      = color[0];
+    native_color.rgbGreen    = color[1];
+    native_color.rgbBlue     = color[2];
+    native_color.rgbReserved = color[3];
+    FreeImage_SetPixelColor(native_, static_cast<std::uint32_t>(position[0]), static_cast<std::uint32_t>(position[1]), &native_color);
+  }
+  void                                     set_pixel_palette_index       (const std::array<std::size_t, 2>& position, std::uint8_t index)
+  {
+    FreeImage_SetPixelIndex(native_, static_cast<std::uint32_t>(position[0]), static_cast<std::uint32_t>(position[1]), &index);
+  }
+  void                                     set_palette                   (const span<std::array<std::uint8_t, 4>> palette)
+  {
+    const auto native_palette = FreeImage_GetPalette(native_);
+    for(auto i = 0; i < palette.size; ++i)
+    {
+      native_palette[i].rgbRed      = palette.data[i][0];
+      native_palette[i].rgbGreen    = palette.data[i][1];
+      native_palette[i].rgbBlue     = palette.data[i][2];
+      native_palette[i].rgbReserved = palette.data[i][3];
+    }
+  }
+  void                                     set_dots_per_meter            (const std::array<std::size_t, 2>& dots_per_meter)
+  {
+    FreeImage_SetDotsPerMeterX(native_, static_cast<std::uint32_t>(dots_per_meter[0]));
+    FreeImage_SetDotsPerMeterY(native_, static_cast<std::uint32_t>(dots_per_meter[1]));
+  }
+  void                                     set_transparent               (const bool transparent)
+  {
+    FreeImage_SetTransparent(native_, transparent);
+  }
+  void                                     set_transparency_table        (const fi::span<std::uint8_t> span)
+  {
+    FreeImage_SetTransparencyTable(native_, span.data, static_cast<std::int32_t>(span.size));
+  }
+  void                                     set_transparent_palette_index (const std::size_t index)
+  {
+    FreeImage_SetTransparentIndex(native_, static_cast<std::int32_t>(index));
+  }
+
+  std::array<std::uint8_t, 4>              pixel_color                   (const std::array<std::size_t, 2>& position) const
+  {
+    RGBQUAD native_color; 
+    FreeImage_GetPixelColor(native_, static_cast<std::uint32_t>(position[0]), static_cast<std::uint32_t>(position[1]), &native_color);
+    return {native_color.rgbRed, native_color.rgbGreen, native_color.rgbBlue, native_color.rgbReserved};
+  }         
+  std::uint8_t                             pixel_palette_index           (const std::array<std::size_t, 2>& position) const
+  {
+    std::uint8_t index;
+    FreeImage_GetPixelIndex(native_, static_cast<std::uint32_t>(position[0]), static_cast<std::uint32_t>(position[1]), &index);
+    return index;
+  }                                                                
+  std::vector<std::array<std::uint8_t, 4>> palette                       () const
+  {
+    std::vector<std::array<std::uint8_t, 4>> palette         (FreeImage_GetColorsUsed(native_));
+    const auto                               native_palette = FreeImage_GetPalette   (native_);
+    for (auto i = 0; i < palette.size(); ++i)
+      palette[i] = {native_palette[i].rgbRed, native_palette[i].rgbGreen, native_palette[i].rgbBlue, native_palette[i].rgbReserved};
+    return palette;
+  }
+  std::array<std::size_t, 2>               dots_per_meter                () const
+  {
+    return {static_cast<std::size_t>(FreeImage_GetDotsPerMeterX(native_)), static_cast<std::size_t>(FreeImage_GetDotsPerMeterY(native_))};
+  }
+  bool                                     transparent                   () const
+  {
+    return FreeImage_IsTransparent(native_) != 0;
+  }
+  span<std::uint8_t>                       transparency_table            () const
+  {
+    return {FreeImage_GetTransparencyTable(native_), static_cast<std::size_t>(FreeImage_GetTransparencyCount(native_))};
+  }
+  std::size_t                              transparent_palette_index     () const
+  {
+    return static_cast<std::size_t>(FreeImage_GetTransparentIndex(native_));
+  }
+
+  void                                     set_background_color          (const std::array<std::uint8_t, 4>& color)
+  {
+    RGBQUAD native_color;
+    native_color.rgbRed      = color[0]; 
+    native_color.rgbGreen    = color[1]; 
+    native_color.rgbBlue     = color[2]; 
+    native_color.rgbReserved = color[3];
+    FreeImage_SetBackgroundColor(native_, &native_color);
+  }
+  void                                     clear_background_color        ()
+  {
+    FreeImage_SetBackgroundColor(native_, nullptr);
+  }
+  std::array<std::uint8_t, 4>              background_color              () const
+  {
+    RGBQUAD native_color;
+    FreeImage_GetBackgroundColor(native_, &native_color);
+    return {native_color.rgbRed, native_color.rgbGreen, native_color.rgbBlue, native_color.rgbReserved};
+  }
+  bool                                     has_background_color          () const
+  {
+    return FreeImage_HasBackgroundColor(native_) != 0;
+  }
+  template<typename color_type>
+  void                                     fill_background               (const color_type& color)
+  {
+    RGBQUAD native_color;
+    native_color.rgbRed      = color[0];
+    native_color.rgbGreen    = color[1];
+    native_color.rgbBlue     = color[2];
+    native_color.rgbReserved = color[3];
+    FreeImage_FillBackground(native_, &native_color, 0);
+  }
+  
+  template<typename color_type>
+  void                                     apply_color_mapping           (span<color_type> source, span<color_type> target, const bool ignore_alpha = false, const bool two_way = false) const
+  {
+    FreeImage_ApplyColorMapping       (native_, reinterpret_cast<RGBQUAD*>     (source.data), reinterpret_cast<RGBQUAD*>     (target.data), static_cast<std::uint32_t>(source.size), ignore_alpha, two_way);
+  }
+  template<typename index_type>
+  void                                     apply_palette_index_mapping   (span<index_type> source, span<index_type> target, const bool ignore_alpha = false, const bool two_way = false) const
+  {
+    FreeImage_ApplyPaletteIndexMapping(native_, reinterpret_cast<std::uint8_t*>(source.data), reinterpret_cast<std::uint8_t*>(target.data), static_cast<std::uint32_t>(source.size),               two_way);
   }
   
   // Adjustment functionality.    
@@ -494,6 +473,12 @@ public:
   }
 
   // Post processing functionality.
+  std::array<unsigned long, 256>           histogram                     (color_channel channel = color_channel::black)                                                                                            const
+  {
+    std::array<unsigned long, 256> histogram_native;
+    FreeImage_GetHistogram(native_, histogram_native.data(), static_cast<FREE_IMAGE_COLOR_CHANNEL>(channel));
+    return histogram_native;
+  }
   void                                     flip_horizontal               ()                                                                                                                                        const
   {
     FreeImage_FlipHorizontal(native_);
@@ -579,6 +564,23 @@ public:
     replace(FreeImage_ConvertTo32Bits   (native_));
   }
   
+  // Thumbnail functionality.
+  void                                     create_thumbnail              (const std::size_t size, const bool convert = true)
+  {
+    const auto thumbnail = FreeImage_MakeThumbnail(native_, static_cast<std::int32_t>(size), convert);
+    FreeImage_SetThumbnail(native_, thumbnail);
+    FreeImage_Unload(thumbnail);
+  }
+  void                                     delete_thumbnail              ()
+  {
+    FreeImage_SetThumbnail(native_, nullptr);
+  }
+  image                                    thumbnail                     ()                                                                                                                                        const
+  {
+    // Note: This image is not managed (its native representation will exist past destruction).
+    return image(FreeImage_GetThumbnail(native_));
+  }
+  
   // ICC functionality.
   template<typename type>
   void                                     create_icc_profile            (const span<type>& span)
@@ -633,7 +635,15 @@ public:
     while (FreeImage_FindNextMetadata(iterator, &tag));
     FreeImage_FindCloseMetadata(iterator);
   }
-
+  BITMAPINFOHEADER*                        bitmap_info_header            ()                                                                                                                                        const
+  {
+    return FreeImage_GetInfoHeader(native_);
+  }
+  BITMAPINFO*                              bitmap_info                   ()                                                                                                                                        const
+  {
+    return FreeImage_GetInfo(native_);
+  }
+  
   // Accessors.                                                                                                                                                                                                    
   FIBITMAP*                                native                        ()                                                                                                                                        const
   {
