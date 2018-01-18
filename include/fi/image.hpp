@@ -194,7 +194,7 @@ public:
   // Save functionality.
   void                                     save                          (const std::string& filepath, const std::int32_t native_flags = 0)                                                                        const
   {
-    FreeImage_Save(format_, native_, filepath.c_str(), native_flags);
+    FreeImage_Save(FreeImage_GetFIFFromFilename(filepath.c_str()), native_, filepath.c_str(), native_flags);
   }
   
   // Property access / mutate functionality.
