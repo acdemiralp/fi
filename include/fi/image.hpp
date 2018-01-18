@@ -258,7 +258,7 @@ public:
   template<typename type = std::uint8_t>                                                                                                                                                                      
   span<type>                               pixels                        ()                                                                                                                                        const
   {
-    return {reinterpret_cast<type*>(FreeImage_GetBits(native_)), dimensions()[0] * pitch() / sizeof type};
+    return {reinterpret_cast<type*>(FreeImage_GetBits(native_)), dimensions()[1] * pitch() / sizeof type};
   }
   template<typename type = std::uint8_t>                                                                                                                                                                      
   span<type>                               line                          (const std::size_t index)                                                                                                                 const
@@ -268,7 +268,7 @@ public:
   template<typename type = std::uint8_t>                                                                                                                                                                      
   std::vector<type>                        to_vector                     (const bool bottom_up = true)                                                                                                             const 
   {
-    std::vector<type> buffer(dimensions()[0] * pitch() / sizeof type);
+    std::vector<type> buffer(dimensions()[1] * pitch() / sizeof type);
     auto mask = color_mask();
     FreeImage_ConvertToRawBits(
       reinterpret_cast<std::uint8_t*>(buffer.data()),
