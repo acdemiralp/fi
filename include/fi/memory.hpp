@@ -25,8 +25,7 @@ public:
     if (!native_)
       throw std::runtime_error("FreeImage_OpenMemory failed.");
   }
-  template<typename type = std::uint8_t>
-  explicit memory  (const span<type>&  span       ) : native_(FreeImage_OpenMemory(reinterpret_cast<std::uint8_t*>(span.data), static_cast<unsigned long>(sizeof type * span.size)))
+  explicit memory  (const span<std::uint8_t>& span) : native_(FreeImage_OpenMemory(span.data, static_cast<unsigned long>(span.size)))
   {
     if (!native_)
       throw std::runtime_error("FreeImage_OpenMemory failed.");
