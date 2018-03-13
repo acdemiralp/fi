@@ -33,10 +33,10 @@ class image
 {
 public: 
   explicit image  (                 
-    const std::array<std::size_t, 2>& dimensions     ,
-    type                              type           = type::bitmap, 
-    const std::size_t                 bits_per_pixel = 8, 
-    const std::array<color_mask, 3>   color_mask     = {color_mask::none, color_mask::none, color_mask::none})
+    const std::array<std::size_t, 2>&  dimensions     ,
+    type                               type           = type::bitmap, 
+    const std::size_t                  bits_per_pixel = 8, 
+    const std::array<color_mask, 3>    color_mask     = {color_mask::none, color_mask::none, color_mask::none})
   : native_(FreeImage_AllocateT(
     static_cast<FREE_IMAGE_TYPE>(type),
     static_cast<std::int32_t> (dimensions[0]),
@@ -49,13 +49,12 @@ public:
     if (!native_)
       throw std::runtime_error("FreeImage_AllocateT failed.");
   }
-  template<typename color_type = std::array<std::uint8_t, 4>>
   explicit image  (                 
-    const color_type&                 color          , 
-    const std::array<std::size_t, 2>& dimensions     , 
-    type                              type           = type::bitmap, 
-    const std::size_t                 bits_per_pixel = 8, 
-    const std::array<color_mask, 3>   color_mask     = {color_mask::none, color_mask::none, color_mask::none})
+    const std::array<std::uint8_t, 4>& color          ,
+    const std::array<std::size_t, 2>&  dimensions     , 
+    type                               type           = type::bitmap, 
+    const std::size_t                  bits_per_pixel = 8, 
+    const std::array<color_mask, 3>    color_mask     = {color_mask::none, color_mask::none, color_mask::none})
   : native_(FreeImage_AllocateExT(
     static_cast<FREE_IMAGE_TYPE>(type),
     static_cast<std::int32_t>   (dimensions[0]),
@@ -72,18 +71,17 @@ public:
     if (!native_)
       throw std::runtime_error("FreeImage_AllocateExT failed.");
   }
-  template<typename data_type = std::uint8_t>
   explicit image  (
-    data_type*                        data           , 
-    const std::array<std::size_t, 2>& dimensions     , 
-    type                              type           = type::bitmap, 
-    const std::size_t                 bits_per_pixel = 8, 
-    const std::array<color_mask, 3>   color_mask     = {color_mask::none, color_mask::none, color_mask::none}, 
-    const bool                        shallow        = false, 
-    const bool                        top_down       = false)
+    std::uint8_t*                      data           ,
+    const std::array<std::size_t, 2>&  dimensions     , 
+    type                               type           = type::bitmap, 
+    const std::size_t                  bits_per_pixel = 8, 
+    const std::array<color_mask, 3>    color_mask     = {color_mask::none, color_mask::none, color_mask::none}, 
+    const bool                         shallow        = false, 
+    const bool                         top_down       = false)
   : native_(FreeImage_ConvertFromRawBitsEx(
     !shallow,
-    reinterpret_cast<std::uint8_t*>(data),
+    data    ,
     static_cast<FREE_IMAGE_TYPE>   (type),
     static_cast<std::int32_t>      (dimensions[0]),
     static_cast<std::int32_t>      (dimensions[1]),
