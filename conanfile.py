@@ -4,7 +4,7 @@ import os
 
 class FiConan(ConanFile):
     name            = "fi"
-    version         = "1.0.0"                     
+    version         = "1.0.1"                     
     description     = "Conan package for fi."           
     url             = "https://github.com/acdemiralp/fi"
     license         = "MIT"                         
