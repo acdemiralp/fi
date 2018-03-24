@@ -4,13 +4,14 @@ import os
 
 class FiConan(ConanFile):
     name            = "fi"
-    version         = "1.0.1"                     
+    version         = "1.0.2"                     
     description     = "Conan package for fi."           
     url             = "https://github.com/acdemiralp/fi"
     license         = "MIT"                         
     settings        = "arch", "build_type", "compiler", "os"
     generators      = "cmake"    
     requires        = "freeimage/3.17.0_2@RWTH-VR/thirdparty"
+    default_options = "freeimage:shared=True"
 
     def source(self):
         zip_name = "%s.zip" % self.version
